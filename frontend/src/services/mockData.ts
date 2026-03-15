@@ -9,6 +9,7 @@ export const MOCK_USERS: User[] = [
   { id: 5, email: 'sarah.lee@company.com', name: 'Sarah Lee', role: 'engineer', created_at: '2024-01-09T10:00:00Z' },
   { id: 6, email: 'mike.johnson@company.com', name: 'Mike Johnson', role: 'engineer', created_at: '2024-01-12T10:00:00Z' },
   { id: 7, email: 'amy.chen@company.com', name: 'Amy Chen', role: 'engineer', created_at: '2024-01-14T10:00:00Z' },
+  { id: 8, email: 'admin@gmail.com', name: 'System Admin', role: 'admin', created_at: '2024-01-01T00:00:00Z' },
 ];
 
 // ─── Mock Assets ─────────────────────────────────────────
@@ -152,11 +153,15 @@ let nextAssignmentId = 9;
 let nextUpdateId = 11;
 let nextPhotoId = 6;
 let nextTicketNum = 46;
+let nextUserId = 9;
+let nextAssetId = 9;
 
 export const getNextRequestId = () => nextRequestId++;
 export const getNextAssignmentId = () => nextAssignmentId++;
 export const getNextUpdateId = () => nextUpdateId++;
 export const getNextPhotoId = () => nextPhotoId++;
+export const getNextUserId = () => nextUserId++;
+export const getNextAssetId = () => nextAssetId++;
 
 export const generateTicketNumber = (): string => {
   const num = nextTicketNum++;

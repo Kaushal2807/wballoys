@@ -314,6 +314,53 @@ export const LoginPage: React.FC = () => {
                   Auto-fill Manager Login
                 </button>
               </div>
+
+              {/* Admin Demo */}
+              <div className="card p-4 border-2 border-transparent hover:border-red-400 transition-all cursor-pointer">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-dark-text flex items-center space-x-2">
+                      <span className="badge bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
+                        Admin
+                      </span>
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-stone-400 mt-1">
+                      Manage users and equipment
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => copyCredentials('admin')}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-dark-border rounded-lg transition-colors"
+                    title="Copy credentials"
+                  >
+                    {copiedRole === 'admin' ? (
+                      <Check className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <Copy className="w-4 h-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-stone-400">Email:</span>
+                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
+                      {DEMO_CREDENTIALS.admin.email}
+                    </code>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-stone-400">Password:</span>
+                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
+                      {DEMO_CREDENTIALS.admin.password}
+                    </code>
+                  </div>
+                </div>
+                <button
+                  onClick={() => fillDemoCredentials('admin')}
+                  className="mt-3 w-full py-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium"
+                >
+                  Auto-fill Admin Login
+                </button>
+              </div>
             </div>
 
             <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">

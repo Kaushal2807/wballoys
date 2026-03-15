@@ -14,6 +14,8 @@ export const Navbar: React.FC = () => {
         return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
       case 'manager':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300';
+      case 'admin':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-stone-800/30 dark:text-stone-300';
     }

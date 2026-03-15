@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Navbar } from '@/components/common/Navbar';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -12,14 +12,27 @@ import { ServiceRequest } from '@/types';
 export const EngineerJobsPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState<ServiceRequest[]>([]);
+  const [allRequests, setAllRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
 
+  const activeTab = searchParams.get('tab') || 'all';
+
+  const setActiveTab = (tab: string) => {
+    setSearchParams({ tab });
+    setFilter('all');
+  };
+
   const loadJobs = useCallback(async () => {
     try {
-      const data = await requestService.getMyJobs(user!.id);
-      setJobs(data);
+      const [myJobs, allReqs] = await Promise.all([
+        requestService.getMyJobs(user!.id),
+        requestService.getAllRequestsForEngineer(user!.id),
+      ]);
+      setJobs(myJobs);
+      setAllRequests(allReqs);
     } finally {
       setLoading(false);
     }
@@ -59,11 +72,35 @@ export const EngineerJobsPage: React.FC = () => {
     }
   };
 
-  const filteredJobs = jobs.filter(j => {
-    if (filter === 'all') return true;
-    if (filter === 'pending') return j.assignment?.status === 'pending';
-    return j.status === filter;
-  });
+  const myAssignedIds = new Set(jobs.map(j => j.id));
+
+  const getFilteredData = () => {
+    const source = activeTab === 'my' ? jobs : allRequests;
+    return source.filter(j => {
+      if (filter === 'all') return true;
+      if (filter === 'pending') return j.assignment?.status === 'pending';
+      return j.status === filter;
+    });
+  };
+
+  const filteredData = getFilteredData();
+
+  const filterOptions = activeTab === 'my'
+    ? [
+        { value: 'all', label: 'All My Jobs' },
+        { value: 'pending', label: 'Pending Acceptance' },
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'closed', label: 'Closed' },
+      ]
+    : [
+        { value: 'all', label: 'All Requests' },
+        { value: 'new', label: 'New' },
+        { value: 'assigned', label: 'Assigned' },
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'closed', label: 'Closed' },
+      ];
 
   return (
     <div className="min-h-screen bg-cream dark:bg-dark-bg">
@@ -72,8 +109,32 @@ export const EngineerJobsPage: React.FC = () => {
         <BackButton label="Back to Dashboard" />
 
         <h1 className="text-2xl font-bold text-gray-900 dark:text-dark-text mb-6">
-          My Jobs
+          {activeTab === 'my' ? 'My Jobs' : 'All Customer Requests'}
         </h1>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 dark:border-dark-border mb-6">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'all'
+                ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-stone-400 dark:hover:text-stone-300'
+            }`}
+          >
+            All Requests ({allRequests.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('my')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'my'
+                ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-stone-400 dark:hover:text-stone-300'
+            }`}
+          >
+            My Jobs ({jobs.length})
+          </button>
+        </div>
 
         <div className="flex flex-wrap gap-4 mb-6">
           <select
@@ -81,30 +142,32 @@ export const EngineerJobsPage: React.FC = () => {
             onChange={(e) => setFilter(e.target.value)}
             className="input-field w-auto"
           >
-            <option value="all">All Jobs</option>
-            <option value="pending">Pending Acceptance</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="closed">Closed</option>
+            {filterOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
         </div>
 
         {loading ? (
           <LoadingSpinner />
-        ) : filteredJobs.length === 0 ? (
+        ) : filteredData.length === 0 ? (
           <div className="card p-8 text-center">
-            <p className="text-gray-500 dark:text-stone-400">No jobs found.</p>
+            <p className="text-gray-500 dark:text-stone-400">
+              {activeTab === 'my' ? 'No jobs found.' : 'No requests found.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredJobs.map(job => (
+            {filteredData.map(job => (
               <JobCard
                 key={job.id}
                 request={job}
-                onAccept={handleAccept}
-                onReject={handleReject}
+                onAccept={activeTab === 'my' ? handleAccept : undefined}
+                onReject={activeTab === 'my' ? handleReject : undefined}
                 onViewDetails={(id) => navigate(`/engineer/jobs/${id}`)}
-                onMarkComplete={handleMarkComplete}
+                onMarkComplete={activeTab === 'my' ? handleMarkComplete : undefined}
+                isMyJob={myAssignedIds.has(job.id)}
+                showMyJobBadge={activeTab === 'all'}
               />
             ))}
           </div>

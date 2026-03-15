@@ -8,25 +8,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Cream background for light mode
+        // Clean white background for light mode
         cream: {
-          DEFAULT: '#fdf8f0',
-          50: '#fefcf7',
-          100: '#fdf8f0',
-          200: '#faf1e0',
+          DEFAULT: '#f9fafb',
+          50: '#ffffff',
+          100: '#f9fafb',
+          200: '#f3f4f6',
         },
-        // Primary accent - Warm Amber
+        // Primary accent - Red (light) / Golden (dark) via CSS variables
         primary: {
-          50: '#fffbeb',
-          100: '#fef3c7',
-          200: '#fde68a',
-          300: '#fcd34d',
-          400: '#fbbf24',
-          500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          800: '#92400e',
-          900: '#78350f',
+          50: 'rgb(var(--color-primary-50) / <alpha-value>)',
+          100: 'rgb(var(--color-primary-100) / <alpha-value>)',
+          200: 'rgb(var(--color-primary-200) / <alpha-value>)',
+          300: 'rgb(var(--color-primary-300) / <alpha-value>)',
+          400: 'rgb(var(--color-primary-400) / <alpha-value>)',
+          500: 'rgb(var(--color-primary-500) / <alpha-value>)',
+          600: 'rgb(var(--color-primary-600) / <alpha-value>)',
+          700: 'rgb(var(--color-primary-700) / <alpha-value>)',
+          800: 'rgb(var(--color-primary-800) / <alpha-value>)',
+          900: 'rgb(var(--color-primary-900) / <alpha-value>)',
         },
         // Dark mode colors - Warm Charcoal
         dark: {

@@ -22,6 +22,8 @@ export const DashboardPage: React.FC = () => {
       return <Navigate to="/engineer/dashboard" replace />;
     case 'manager':
       return <Navigate to="/manager/dashboard" replace />;
+    case 'admin':
+      return <Navigate to="/admin/dashboard" replace />;
     default:
       return <Navigate to="/login" replace />;
   }

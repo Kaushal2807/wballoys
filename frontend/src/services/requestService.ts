@@ -7,6 +7,7 @@ import {
   MOCK_USERS, MOCK_ASSETS, MOCK_REQUESTS, MOCK_ASSIGNMENTS,
   MOCK_UPDATES, MOCK_PHOTOS,
   getNextRequestId, getNextAssignmentId, getNextUpdateId, getNextPhotoId,
+  getNextUserId, getNextAssetId,
   generateTicketNumber,
 } from './mockData';
 
@@ -72,12 +73,20 @@ export const requestService = {
     return populateRequest(request);
   },
 
-  getAssetsByCustomer: async (customerId: number): Promise<Asset[]> => {
+  getAssetsByCustomer: async (_customerId: number): Promise<Asset[]> => {
     await delay(200);
-    return MOCK_ASSETS.filter(a => a.customer_id === customerId);
+    return [...MOCK_ASSETS];
   },
 
   // ─── Engineer Operations ─────────────────────────────
+
+  // Get ALL customer requests (visible to all engineers)
+  getAllRequestsForEngineer: async (_engineerId: number): Promise<ServiceRequest[]> => {
+    await delay(300);
+    return MOCK_REQUESTS
+      .map(populateRequest)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
 
   getMyJobs: async (engineerId: number): Promise<ServiceRequest[]> => {
     await delay(300);
@@ -252,9 +261,8 @@ export const requestService = {
     if (role === 'customer') {
       requests = MOCK_REQUESTS.filter(r => r.customer_id === userId);
     } else if (role === 'engineer') {
-      const myAssignments = MOCK_ASSIGNMENTS.filter(a => a.engineer_id === userId);
-      const requestIds = myAssignments.map(a => a.request_id);
-      requests = MOCK_REQUESTS.filter(r => requestIds.includes(r.id));
+      // Engineer sees stats for all requests (since all are visible now)
+      requests = [...MOCK_REQUESTS];
     } else {
       requests = [...MOCK_REQUESTS];
     }
@@ -268,5 +276,54 @@ export const requestService = {
       closed_requests: requests.filter(r => r.status === 'closed').length,
       urgent_requests: requests.filter(r => r.urgency === 'high').length,
     };
+  },
+
+  // ─── Admin Operations ─────────────────────────────────
+
+  getAllUsers: async (): Promise<User[]> => {
+    await delay(200);
+    return MOCK_USERS.filter(u => u.role !== 'admin');
+  },
+
+  createUser: async (name: string, email: string, _password: string, role: string): Promise<User> => {
+    await delay(400);
+    const existing = MOCK_USERS.find(u => u.email === email);
+    if (existing) throw new Error('A user with this email already exists');
+    const newUser: User = {
+      id: getNextUserId(),
+      name,
+      email,
+      role: role as User['role'],
+      created_at: new Date().toISOString(),
+    };
+    MOCK_USERS.push(newUser);
+    return newUser;
+  },
+
+  getAllAssets: async (): Promise<Asset[]> => {
+    await delay(200);
+    return [...MOCK_ASSETS];
+  },
+
+  createAsset: async (
+    asset_name: string, model: string,
+    serial_number: string, location: string
+  ): Promise<Asset> => {
+    await delay(400);
+    const newAsset: Asset = {
+      id: getNextAssetId(),
+      customer_id: 0,
+      asset_name,
+      model,
+      serial_number,
+      location,
+    };
+    MOCK_ASSETS.push(newAsset);
+    return newAsset;
+  },
+
+  getCustomers: async (): Promise<User[]> => {
+    await delay(200);
+    return MOCK_USERS.filter(u => u.role === 'customer');
   },
 };

@@ -1,5 +1,6 @@
 import apiClient from './api';
 import { LoginCredentials, AuthResponse, DEMO_CREDENTIALS } from '@/types';
+import { MOCK_USERS as ALL_MOCK_USERS } from './mockData';
 
 // Mock users for demo login (until backend is ready)
 const MOCK_USERS: AuthResponse[] = [
@@ -33,6 +34,16 @@ const MOCK_USERS: AuthResponse[] = [
       created_at: new Date().toISOString(),
     },
   },
+  {
+    token: 'mock-admin-token-' + Date.now(),
+    user: {
+      id: 8,
+      email: 'admin@gmail.com',
+      name: 'System Admin',
+      role: 'admin',
+      created_at: new Date().toISOString(),
+    },
+  },
 ];
 
 export const authService = {
@@ -61,6 +72,24 @@ export const authService = {
       credentials.password === DEMO_CREDENTIALS.manager.password
     ) {
       return MOCK_USERS[2];
+    }
+
+    if (
+      credentials.email === DEMO_CREDENTIALS.admin.email &&
+      credentials.password === DEMO_CREDENTIALS.admin.password
+    ) {
+      return MOCK_USERS[3];
+    }
+
+    // Also check dynamically created users
+    const dynamicUser = ALL_MOCK_USERS.find(
+      u => u.email === credentials.email && u.role !== 'admin'
+    );
+    if (dynamicUser) {
+      return {
+        token: `mock-${dynamicUser.role}-token-` + Date.now(),
+        user: dynamicUser,
+      };
     }
 
     // Invalid credentials

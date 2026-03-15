@@ -103,7 +103,8 @@ Standard job states:
 - Sign completion reports
 
 ### 4.2 Engineer
-- View assigned jobs
+- View all customer service requests (browse all)
+- View assigned jobs (personal work queue)
 - Accept/reject assignment
 - Update checklist and status
 - Upload evidence
@@ -214,7 +215,8 @@ Scheduler -> FastAPI KPI job -> Database KPI tables
 - /auth/*
 - /customers/*
 - /assets/*
-- /requests/*
+- /requests/* (role-filtered: customer sees own, engineer sees assigned)
+- /requests/all (all requests - visible to engineers and managers)
 - /jobs/*
 - /jobs/{id}/assign
 - /jobs/{id}/accept

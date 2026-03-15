@@ -1,5 +1,5 @@
 // User and Auth Types
-export type UserRole = 'customer' | 'engineer' | 'manager';
+export type UserRole = 'customer' | 'engineer' | 'manager' | 'admin';
 
 export interface User {
   id: number;
@@ -136,5 +136,9 @@ export const DEMO_CREDENTIALS = {
   manager: {
     email: 'manager@gmail.com',
     password: 'manager123',
+  },
+  admin: {
+    email: 'admin@gmail.com',
+    password: 'admin123',
   },
 } as const;

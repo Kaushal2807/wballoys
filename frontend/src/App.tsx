@@ -11,6 +11,7 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { CustomerDashboard } from '@/pages/CustomerDashboard';
 import { EngineerDashboard } from '@/pages/EngineerDashboard';
 import { ManagerDashboard } from '@/pages/ManagerDashboard';
+import { AdminDashboard } from '@/pages/AdminDashboard';
 
 // Customer Pages
 import { CustomerRequestsPage } from '@/pages/customer/CustomerRequestsPage';
@@ -103,6 +104,15 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ManagerDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/dashboard"
+        element={
+          <ProtectedRoute>
+            <AdminDashboard />
           </ProtectedRoute>
         }
       />

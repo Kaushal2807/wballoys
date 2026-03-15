@@ -20,8 +20,9 @@ A simplified two-portal service management system for managing equipment service
 - Auto-generate ticket number
 
 ### 3. Job Assignment Workflow
-- Manager assigns job to engineer
-- Engineer can accept/reject
+- All customer requests are visible to all engineers
+- Manager can also assign specific jobs to engineers
+- Engineer can accept/reject assigned jobs
 - Job status tracking (5 simple states)
 
 ### 4. Simple Job Execution
@@ -32,7 +33,7 @@ A simplified two-portal service management system for managing equipment service
 
 ### 5. Basic Dashboard
 - Customer: View my requests and status
-- Engineer: View assigned jobs
+- Engineer: View all customer requests + view assigned jobs
 - Manager: View all jobs and simple statistics
 
 ---
@@ -242,17 +243,29 @@ New → Assigned → In Progress → Completed → Closed
 └────┬────┘
      │
      ▼
-┌──────────────────┐
-│   Dashboard      │
-│ • Assigned Jobs  │
-│ • Pending (2)    │
-│ • Active (3)     │
-└────┬─────────────┘
+┌───────────────────────────┐
+│       Dashboard           │
+│                           │
+│  ┌─────────────────────┐  │
+│  │  My Assigned Jobs   │  │
+│  │  • Pending (2)      │  │
+│  │  • Active (3)       │  │
+│  └─────────────────────┘  │
+│                           │
+│  ┌─────────────────────┐  │
+│  │  All Customer       │  │
+│  │  Requests           │  │
+│  │  • Browse all (10)  │  │
+│  │  • View any request │  │
+│  └─────────────────────┘  │
+└────┬──────────────────────┘
+     │
+     ├──── View any request ──▶ Job Details (read-only)
      │
      ▼
 ┌────────────────────┐
 │  Job Assignment    │
-│  Notification      │
+│  (assigned by mgr) │
 │  [Accept] [Reject] │
 └────┬───────────────┘
      │
@@ -686,6 +699,7 @@ New → Assigned → In Progress → Completed → Closed
 ### Service Requests
 - POST `/api/requests` (customer creates)
 - GET `/api/requests` (list with filters by role)
+- GET `/api/requests/all` (all requests - for engineers to browse all customer requests)
 - GET `/api/requests/{id}` (details)
 - PATCH `/api/requests/{id}/status` (update status)
 
@@ -724,6 +738,7 @@ src/
 │   │   └── RequestList.tsx
 │   ├── engineer/
 │   │   ├── AssignedJobs.tsx
+│   │   ├── AllRequests.tsx
 │   │   └── JobDetails.tsx
 │   └── manager/
 │       ├── AllJobs.tsx
@@ -765,7 +780,7 @@ app/
 │   └── assignment.py
 ├── routers/
 │   ├── auth.py
-│   ├── requests.py
+│   ├── requests.py          # includes GET /all for engineer access
 │   ├── assignments.py
 │   └── dashboard.py
 ├── dependencies/
@@ -773,6 +788,785 @@ app/
 └── utils/
     └── security.py (password hashing)
 ```
+
+---
+
+## FastAPI Backend Implementation
+
+### main.py
+```python
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import auth, requests, assignments, dashboard
+from app.database import engine, Base
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="WB Alloys Service Management API", version="1.0.0")
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "https://your-app.vercel.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(requests.router, prefix="/api/requests", tags=["Service Requests"])
+app.include_router(assignments.router, prefix="/api/assignments", tags=["Assignments"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+
+@app.get("/")
+def root():
+    return {"message": "WB Alloys Service Management API"}
+```
+
+### config.py
+```python
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    DATABASE_URL: str
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+```
+
+### database.py
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from app.config import settings
+
+engine = create_engine(settings.DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+```
+
+### models/user.py
+```python
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.sql import func
+from app.database import Base
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    role = Column(String, nullable=False)  # customer, engineer, manager
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+```
+
+### models/service_request.py
+```python
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from app.database import Base
+
+class Asset(Base):
+    __tablename__ = "assets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    asset_name = Column(String, nullable=False)
+    model = Column(String, nullable=False)
+    serial_number = Column(String, nullable=False)
+    location = Column(String, nullable=False)
+
+    customer = relationship("User")
+
+class ServiceRequest(Base):
+    __tablename__ = "service_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_number = Column(String, unique=True, index=True, nullable=False)
+    customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
+    description = Column(String, nullable=False)
+    urgency = Column(String, nullable=False)  # low, medium, high
+    preferred_date = Column(String, nullable=False)
+    preferred_time = Column(String, nullable=False)
+    status = Column(String, default="new", nullable=False)  # new, assigned, in_progress, completed, closed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    customer = relationship("User", foreign_keys=[customer_id])
+    asset = relationship("Asset")
+    assignment = relationship("JobAssignment", back_populates="request", uselist=False)
+
+class JobAssignment(Base):
+    __tablename__ = "job_assignments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("service_requests.id"), nullable=False)
+    engineer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assigned_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String, default="pending", nullable=False)  # pending, accepted, rejected
+
+    request = relationship("ServiceRequest", back_populates="assignment")
+    engineer = relationship("User", foreign_keys=[engineer_id])
+    assigner = relationship("User", foreign_keys=[assigned_by])
+
+class JobUpdate(Base):
+    __tablename__ = "job_updates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("service_requests.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    notes = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User")
+
+class JobPhoto(Base):
+    __tablename__ = "job_photos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("service_requests.id"), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    photo_url = Column(String, nullable=False)
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    uploader = relationship("User")
+```
+
+### schemas/request.py
+```python
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+
+class RequestCreate(BaseModel):
+    asset_id: int
+    description: str
+    urgency: str  # low, medium, high
+    preferred_date: str
+    preferred_time: str
+
+class RequestResponse(BaseModel):
+    id: int
+    ticket_number: str
+    customer_id: int
+    asset_id: int
+    description: str
+    urgency: str
+    preferred_date: str
+    preferred_time: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AssignmentCreate(BaseModel):
+    request_id: int
+    engineer_id: int
+    note: Optional[str] = ""
+
+class AssignmentResponse(BaseModel):
+    id: int
+    request_id: int
+    engineer_id: int
+    assigned_by: int
+    assigned_at: datetime
+    accepted_at: Optional[datetime]
+    status: str
+
+    class Config:
+        from_attributes = True
+```
+
+### dependencies/auth.py
+```python
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+from app.config import settings
+from app.database import get_db
+from app.models.user import User
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+def require_role(*roles):
+    """Dependency that checks if user has one of the required roles"""
+    def role_checker(current_user: User = Depends(get_current_user)):
+        if current_user.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required role: {', '.join(roles)}"
+            )
+        return current_user
+    return role_checker
+```
+
+### routers/auth.py
+```python
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+from jose import jwt
+from datetime import datetime, timedelta
+from app.database import get_db
+from app.config import settings
+from app.models.user import User
+from app.dependencies.auth import get_current_user
+from pydantic import BaseModel
+
+router = APIRouter()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str  # customer, engineer, manager
+
+def create_access_token(data: dict):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+@router.post("/register")
+def register(data: RegisterRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == data.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = User(
+        email=data.email,
+        password_hash=pwd_context.hash(data.password),
+        name=data.name,
+        role=data.role,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token({"sub": user.id})
+    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name, "role": user.role}}
+
+@router.post("/login")
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user or not pwd_context.verify(data.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    token = create_access_token({"sub": user.id})
+    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name, "role": user.role}}
+
+@router.get("/me")
+def get_me(current_user: User = Depends(get_current_user)):
+    return {"id": current_user.id, "email": current_user.email, "name": current_user.name, "role": current_user.role}
+```
+
+### routers/requests.py (Engineer Dual-Access: All Requests + Assigned Jobs)
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session, joinedload
+from datetime import datetime
+from app.database import get_db
+from app.models.user import User
+from app.models.service_request import ServiceRequest, JobAssignment, JobUpdate, JobPhoto, Asset
+from app.schemas.request import RequestCreate, RequestResponse
+from app.dependencies.auth import get_current_user, require_role
+
+router = APIRouter()
+
+# ─── Ticket Number Generator ───────────────────────────
+import random
+def generate_ticket_number(db: Session) -> str:
+    count = db.query(ServiceRequest).count() + 1
+    return f"REQ-2024-{str(count).zfill(4)}"
+
+# ─── GET /api/requests (Role-based filtering) ──────────
+@router.get("/")
+def get_requests(
+    status: str = None,
+    urgency: str = None,
+    search: str = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns requests based on the user's role:
+    - Customer: only their own requests
+    - Engineer: only their assigned jobs (use GET /all for all requests)
+    - Manager: all requests
+    """
+    query = db.query(ServiceRequest).options(
+        joinedload(ServiceRequest.customer),
+        joinedload(ServiceRequest.asset),
+        joinedload(ServiceRequest.assignment),
+    )
+
+    if current_user.role == "customer":
+        query = query.filter(ServiceRequest.customer_id == current_user.id)
+    elif current_user.role == "engineer":
+        # Engineer's assigned jobs only
+        query = query.join(JobAssignment).filter(JobAssignment.engineer_id == current_user.id)
+    # Manager sees all - no filter needed
+
+    if status and status != "all":
+        query = query.filter(ServiceRequest.status == status)
+    if urgency and urgency != "all":
+        query = query.filter(ServiceRequest.urgency == urgency)
+    if search:
+        query = query.filter(
+            ServiceRequest.ticket_number.ilike(f"%{search}%") |
+            ServiceRequest.description.ilike(f"%{search}%")
+        )
+
+    return query.order_by(ServiceRequest.created_at.desc()).all()
+
+# ─── GET /api/requests/all (ALL requests - visible to engineers) ────
+@router.get("/all")
+def get_all_requests(
+    status: str = None,
+    urgency: str = None,
+    current_user: User = Depends(require_role("engineer", "manager")),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns ALL customer service requests.
+    Accessible by engineers (to browse all requests) and managers.
+    Engineers can view any request but can only work on assigned ones.
+    """
+    query = db.query(ServiceRequest).options(
+        joinedload(ServiceRequest.customer),
+        joinedload(ServiceRequest.asset),
+        joinedload(ServiceRequest.assignment),
+    )
+
+    if status and status != "all":
+        query = query.filter(ServiceRequest.status == status)
+    if urgency and urgency != "all":
+        query = query.filter(ServiceRequest.urgency == urgency)
+
+    return query.order_by(ServiceRequest.created_at.desc()).all()
+
+# ─── GET /api/requests/{id} (Details) ──────────────────
+@router.get("/{request_id}")
+def get_request(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Any authenticated user can view request details."""
+    request = db.query(ServiceRequest).options(
+        joinedload(ServiceRequest.customer),
+        joinedload(ServiceRequest.asset),
+        joinedload(ServiceRequest.assignment),
+    ).filter(ServiceRequest.id == request_id).first()
+
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    # Customers can only view their own requests
+    if current_user.role == "customer" and request.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return request
+
+# ─── POST /api/requests (Customer creates) ─────────────
+@router.post("/", status_code=201)
+def create_request(
+    data: RequestCreate,
+    current_user: User = Depends(require_role("customer")),
+    db: Session = Depends(get_db),
+):
+    ticket = generate_ticket_number(db)
+    request = ServiceRequest(
+        ticket_number=ticket,
+        customer_id=current_user.id,
+        asset_id=data.asset_id,
+        description=data.description,
+        urgency=data.urgency,
+        preferred_date=data.preferred_date,
+        preferred_time=data.preferred_time,
+        status="new",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return request
+
+# ─── PATCH /api/requests/{id}/status (Update status) ───
+@router.patch("/{request_id}/status")
+def update_status(
+    request_id: int,
+    status_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    new_status = status_data.get("status")
+    valid_transitions = {
+        "assigned": ["in_progress"],         # Engineer accepts
+        "in_progress": ["completed"],        # Engineer completes
+        "completed": ["closed"],             # Customer/Manager closes
+    }
+
+    if request.status in valid_transitions and new_status in valid_transitions[request.status]:
+        request.status = new_status
+        request.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(request)
+        return request
+
+    raise HTTPException(status_code=400, detail=f"Cannot transition from {request.status} to {new_status}")
+
+# ─── POST /api/requests/{id}/updates (Add notes) ───────
+@router.post("/{request_id}/updates")
+def add_update(
+    request_id: int,
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    update = JobUpdate(
+        request_id=request_id,
+        user_id=current_user.id,
+        notes=data["notes"],
+    )
+    db.add(update)
+    db.commit()
+    db.refresh(update)
+    return update
+
+# ─── GET /api/requests/{id}/updates (Get history) ──────
+@router.get("/{request_id}/updates")
+def get_updates(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return db.query(JobUpdate).options(
+        joinedload(JobUpdate.user)
+    ).filter(
+        JobUpdate.request_id == request_id
+    ).order_by(JobUpdate.created_at.desc()).all()
+
+# ─── POST /api/requests/{id}/photos (Upload) ───────────
+@router.post("/{request_id}/photos")
+def upload_photo(
+    request_id: int,
+    data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # In production, handle file upload to Cloudinary here
+    photo = JobPhoto(
+        request_id=request_id,
+        uploaded_by=current_user.id,
+        photo_url=data.get("photo_url", ""),
+    )
+    db.add(photo)
+    db.commit()
+    db.refresh(photo)
+    return photo
+
+# ─── GET /api/requests/{id}/photos (List) ──────────────
+@router.get("/{request_id}/photos")
+def get_photos(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return db.query(JobPhoto).options(
+        joinedload(JobPhoto.uploader)
+    ).filter(
+        JobPhoto.request_id == request_id
+    ).all()
+```
+
+### routers/assignments.py
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from datetime import datetime
+from app.database import get_db
+from app.models.user import User
+from app.models.service_request import ServiceRequest, JobAssignment, JobUpdate
+from app.schemas.request import AssignmentCreate
+from app.dependencies.auth import get_current_user, require_role
+
+router = APIRouter()
+
+# ─── POST /api/assignments (Manager assigns engineer) ──
+@router.post("/", status_code=201)
+def assign_engineer(
+    data: AssignmentCreate,
+    current_user: User = Depends(require_role("manager")),
+    db: Session = Depends(get_db),
+):
+    """Manager assigns an engineer to a service request."""
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == data.request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    engineer = db.query(User).filter(User.id == data.engineer_id, User.role == "engineer").first()
+    if not engineer:
+        raise HTTPException(status_code=404, detail="Engineer not found")
+
+    # Check if already assigned
+    existing = db.query(JobAssignment).filter(
+        JobAssignment.request_id == data.request_id,
+        JobAssignment.status != "rejected",
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Request already has an active assignment")
+
+    assignment = JobAssignment(
+        request_id=data.request_id,
+        engineer_id=data.engineer_id,
+        assigned_by=current_user.id,
+        status="pending",
+    )
+    db.add(assignment)
+
+    # Update request status to assigned
+    request.status = "assigned"
+    request.updated_at = datetime.utcnow()
+
+    # Add assignment note
+    if data.note:
+        update = JobUpdate(
+            request_id=data.request_id,
+            user_id=current_user.id,
+            notes=f"Assigned to {engineer.name}. Note: {data.note}",
+        )
+        db.add(update)
+
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+# ─── PATCH /api/assignments/{id}/accept (Engineer accepts) ─
+@router.patch("/{assignment_id}/accept")
+def accept_assignment(
+    assignment_id: int,
+    current_user: User = Depends(require_role("engineer")),
+    db: Session = Depends(get_db),
+):
+    """Engineer accepts an assigned job."""
+    assignment = db.query(JobAssignment).filter(JobAssignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if assignment.engineer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="This job is not assigned to you")
+
+    assignment.status = "accepted"
+    assignment.accepted_at = datetime.utcnow()
+
+    # Update request status to in_progress
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == assignment.request_id).first()
+    if request:
+        request.status = "in_progress"
+        request.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+# ─── PATCH /api/assignments/{id}/reject (Engineer rejects) ─
+@router.patch("/{assignment_id}/reject")
+def reject_assignment(
+    assignment_id: int,
+    current_user: User = Depends(require_role("engineer")),
+    db: Session = Depends(get_db),
+):
+    """Engineer rejects an assigned job. Request goes back to 'new' status."""
+    assignment = db.query(JobAssignment).filter(JobAssignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if assignment.engineer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="This job is not assigned to you")
+
+    assignment.status = "rejected"
+
+    # Revert request status back to new
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == assignment.request_id).first()
+    if request:
+        request.status = "new"
+        request.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+# ─── GET /api/assignments/engineers (List engineers) ────
+@router.get("/engineers")
+def get_engineers(
+    current_user: User = Depends(require_role("manager")),
+    db: Session = Depends(get_db),
+):
+    """Returns all engineers for the assignment dropdown."""
+    return db.query(User).filter(User.role == "engineer").all()
+```
+
+### routers/dashboard.py
+```python
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from app.database import get_db
+from app.models.user import User
+from app.models.service_request import ServiceRequest, JobAssignment
+from app.dependencies.auth import get_current_user
+
+router = APIRouter()
+
+@router.get("/stats")
+def get_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Dashboard statistics based on user role:
+    - Customer: stats for their own requests only
+    - Engineer: stats for ALL requests (since all are visible to engineers)
+    - Manager: stats for all requests
+    """
+    query = db.query(ServiceRequest)
+
+    if current_user.role == "customer":
+        query = query.filter(ServiceRequest.customer_id == current_user.id)
+    # Engineer and Manager see stats for ALL requests
+
+    requests = query.all()
+
+    return {
+        "total_requests": len(requests),
+        "new_requests": len([r for r in requests if r.status == "new"]),
+        "assigned_requests": len([r for r in requests if r.status == "assigned"]),
+        "in_progress_requests": len([r for r in requests if r.status == "in_progress"]),
+        "completed_requests": len([r for r in requests if r.status == "completed"]),
+        "closed_requests": len([r for r in requests if r.status == "closed"]),
+        "urgent_requests": len([r for r in requests if r.urgency == "high"]),
+    }
+```
+
+### Backend requirements.txt
+```
+fastapi==0.109.0
+uvicorn==0.27.0
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+cloudinary==1.38.0
+alembic==1.13.1
+```
+
+---
+
+## Engineer Dual-Access Architecture
+
+The system provides two ways engineers interact with service requests:
+
+### 1. All Customer Requests (Browse Mode)
+- **API**: `GET /api/requests/all`
+- **Access**: All engineers can see every customer request
+- **Purpose**: Engineers can browse, understand workload, and view any request details
+- **Frontend**: "All Customer Requests" section on dashboard + "All Requests" tab on jobs page
+
+### 2. Assigned Jobs (Work Mode)
+- **API**: `GET /api/requests` (filtered by engineer's assignments)
+- **Access**: Only shows jobs specifically assigned to the logged-in engineer
+- **Purpose**: Engineer's personal work queue with accept/reject/complete actions
+- **Frontend**: "My Assigned Jobs" section on dashboard + "My Jobs" tab on jobs page
+
+### How Assignment Works
+```
+                    ┌─────────────────────────────┐
+                    │   ALL CUSTOMER REQUESTS      │
+                    │   (Visible to ALL engineers) │
+                    └──────────┬──────────────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+              ▼                ▼                ▼
+     ┌────────────┐   ┌────────────┐   ┌────────────┐
+     │  Manager   │   │  Engineer  │   │  Engineer  │
+     │  assigns   │   │  can VIEW  │   │  can VIEW  │
+     │  REQ-042   │   │  any req   │   │  any req   │
+     │  to John   │   │  details   │   │  details   │
+     └─────┬──────┘   └────────────┘   └────────────┘
+           │
+           ▼
+     ┌─────────────────────────┐
+     │  John's "My Jobs" queue │
+     │  REQ-042 [Accept/Reject]│
+     └─────────────────────────┘
+```
+
+### Key Rules
+- **Viewing**: Any engineer can view any request's details (read-only)
+- **Working**: Engineers can only accept/reject/update jobs assigned to them by a manager
+- **Manager**: Can assign any unassigned request to any engineer
+- **Status**: Only changes when engineer accepts (→ in_progress) or manager assigns (→ assigned)
 
 ---
 
@@ -1707,12 +2501,14 @@ The system stores `preferred_date` and `preferred_time` in the database and disp
 
 ### Scenario 3: Engineer Flow
 1. Engineer logs in
-2. Sees assigned job with preferred visit schedule
-3. Accepts job
-4. Updates status to "In Progress"
-5. Adds work notes
-6. Uploads photos
-7. Marks as completed
+2. Sees dashboard with two sections: "My Assigned Jobs" and "All Customer Requests"
+3. Can browse all customer requests and view details for any request
+4. Sees assigned job with preferred visit schedule
+5. Accepts job
+6. Updates status to "In Progress"
+7. Adds work notes
+8. Uploads photos
+9. Marks as completed
 
 ---
 
