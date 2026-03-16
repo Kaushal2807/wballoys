@@ -1,4 +1,4 @@
-import { RequestStatus, UrgencyLevel } from '../types';
+import { RequestStatus, UrgencyLevel, DeliveryStatus } from '../types';
 
 export const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
@@ -50,4 +50,24 @@ export const getStatusLabel = (status: RequestStatus): string => {
     closed: 'CLOSED',
   };
   return map[status] || status.toUpperCase();
+};
+
+export const getDeliveryStatusLabel = (status: DeliveryStatus): string => {
+  const map: Record<DeliveryStatus, string> = {
+    pending: 'PENDING',
+    dispatched: 'DISPATCHED',
+    in_transit: 'IN TRANSIT',
+    delivered: 'DELIVERED',
+  };
+  return map[status] || status.toUpperCase();
+};
+
+export const getDeliveryStatusColor = (status: DeliveryStatus): string => {
+  const map: Record<DeliveryStatus, string> = {
+    pending: 'delivery-pending',
+    dispatched: 'delivery-dispatched',
+    in_transit: 'delivery-in-transit',
+    delivered: 'delivery-delivered',
+  };
+  return map[status] || 'delivery-pending';
 };

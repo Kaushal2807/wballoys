@@ -1,4 +1,4 @@
-import { User, Asset, ServiceRequest, JobAssignment, JobUpdate, JobPhoto } from '../types';
+import { User, Asset, ServiceRequest, JobAssignment, JobUpdate, JobPhoto, DeliveryUpdate } from '../types';
 
 // ─── Mock Users ──────────────────────────────────────────
 export const MOCK_USERS: User[] = [
@@ -147,6 +147,9 @@ export const MOCK_PHOTOS: JobPhoto[] = [
   { id: 5, request_id: 9, uploaded_by: 4, photo_url: 'https://placehold.co/400x300/fef3c7/92400e?text=Elevator+Repair', uploaded_at: '2024-03-03T11:30:00Z' },
 ];
 
+// ─── Mock Delivery Updates ──────────────────────────────
+export const MOCK_DELIVERIES: DeliveryUpdate[] = [];
+
 // ─── Auto-increment counters ─────────────────────────────
 let nextRequestId = 11;
 let nextAssignmentId = 9;
@@ -155,6 +158,7 @@ let nextPhotoId = 6;
 let nextTicketNum = 46;
 let nextUserId = 9;
 let nextAssetId = 9;
+let nextDeliveryId = 1;
 
 export const getNextRequestId = () => nextRequestId++;
 export const getNextAssignmentId = () => nextAssignmentId++;
@@ -162,6 +166,7 @@ export const getNextUpdateId = () => nextUpdateId++;
 export const getNextPhotoId = () => nextPhotoId++;
 export const getNextUserId = () => nextUserId++;
 export const getNextAssetId = () => nextAssetId++;
+export const getNextDeliveryId = () => nextDeliveryId++;
 
 export const generateTicketNumber = (): string => {
   const num = nextTicketNum++;

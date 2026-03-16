@@ -11,9 +11,9 @@ import { PhotoGallery } from '@/components/common/PhotoGallery';
 import { PhotoUpload } from '@/components/common/PhotoUpload';
 import { useAuth } from '@/contexts/AuthContext';
 import { requestService } from '@/services/requestService';
-import { ServiceRequest, JobUpdate, JobPhoto } from '@/types';
-import { formatDate } from '@/utils/helpers';
-import { MapPin, Wrench, User, Calendar, Play, CheckCircle, ThumbsUp, ThumbsDown, Send } from 'lucide-react';
+import { ServiceRequest, JobUpdate, JobPhoto, DeliveryUpdate, DeliveryStatus } from '@/types';
+import { formatDate, formatDateTime } from '@/utils/helpers';
+import { MapPin, Wrench, User, Calendar, Play, CheckCircle, ThumbsUp, ThumbsDown, Send, Truck, Package, ArrowRight, Check } from 'lucide-react';
 
 export const JobDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,17 +24,22 @@ export const JobDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [noteText, setNoteText] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+  const [deliveryUpdates, setDeliveryUpdates] = useState<DeliveryUpdate[]>([]);
+  const [deliveryNotes, setDeliveryNotes] = useState('');
+  const [updatingDelivery, setUpdatingDelivery] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const [req, upd, pht] = await Promise.all([
+      const [req, upd, pht, delUpdates] = await Promise.all([
         requestService.getRequestById(parseInt(id!)),
         requestService.getRequestUpdates(parseInt(id!)),
         requestService.getRequestPhotos(parseInt(id!)),
+        requestService.getDeliveryUpdates(parseInt(id!)),
       ]);
       setRequest(req);
       setUpdates(upd);
       setPhotos(pht);
+      setDeliveryUpdates(delUpdates);
     } finally {
       setLoading(false);
     }
@@ -117,6 +122,48 @@ export const JobDetailsPage: React.FC = () => {
     await requestService.uploadPhoto(request.id, file, user!.id);
     toast.success('Photo uploaded!');
     loadData();
+  };
+
+  const DELIVERY_STEPS: { status: DeliveryStatus; label: string }[] = [
+    { status: 'pending', label: 'Pending' },
+    { status: 'dispatched', label: 'Dispatched' },
+    { status: 'in_transit', label: 'In Transit' },
+    { status: 'delivered', label: 'Delivered' },
+  ];
+
+  const currentDeliveryStatus = request?.delivery_status || 'pending';
+  const currentDeliveryIndex = DELIVERY_STEPS.findIndex(s => s.status === currentDeliveryStatus);
+
+  const getNextDeliveryStatus = (): DeliveryStatus | null => {
+    const nextIndex = currentDeliveryIndex + 1;
+    if (nextIndex >= DELIVERY_STEPS.length) return null;
+    return DELIVERY_STEPS[nextIndex].status;
+  };
+
+  const getNextDeliveryButtonLabel = (): string => {
+    const next = getNextDeliveryStatus();
+    if (!next) return '';
+    const labels: Record<DeliveryStatus, string> = {
+      pending: '',
+      dispatched: 'Mark as Dispatched',
+      in_transit: 'Mark as In Transit',
+      delivered: 'Mark as Delivered',
+    };
+    return labels[next];
+  };
+
+  const handleUpdateDelivery = async () => {
+    if (!request) return;
+    const nextStatus = getNextDeliveryStatus();
+    if (!nextStatus) return;
+    setUpdatingDelivery(true);
+    try {
+      await requestService.updateDeliveryStatus(request.id, nextStatus, user!.id, deliveryNotes.trim() || undefined);
+      toast.success(`Delivery status updated to "${DELIVERY_STEPS.find(s => s.status === nextStatus)?.label}"`);
+      setDeliveryNotes('');
+      loadData();
+    } catch { toast.error('Failed to update delivery status'); }
+    finally { setUpdatingDelivery(false); }
   };
 
   if (loading) return (
@@ -264,6 +311,117 @@ export const JobDetailsPage: React.FC = () => {
           <div className="card p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text mb-4">Upload Photos</h2>
             <PhotoUpload existingPhotoCount={photos.length} onUpload={handlePhotoUpload} />
+          </div>
+        )}
+
+        {/* Delivery Status Section */}
+        {(isInProgress || request.status === 'completed') && (
+          <div className="card p-6 mb-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Truck className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text">Delivery Status</h2>
+            </div>
+
+            {/* Progress Steps */}
+            <div className="flex items-center justify-between mb-6">
+              {DELIVERY_STEPS.map((step, index) => {
+                const isCompleted = index < currentDeliveryIndex;
+                const isCurrent = index === currentDeliveryIndex;
+                return (
+                  <React.Fragment key={step.status}>
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+                        isCompleted
+                          ? 'bg-green-500 text-white'
+                          : isCurrent
+                          ? 'bg-primary-600 text-white ring-4 ring-primary-100 dark:ring-primary-900/30'
+                          : 'bg-gray-200 text-gray-500 dark:bg-stone-700 dark:text-stone-400'
+                      }`}>
+                        {isCompleted ? <Check className="w-4 h-4" /> : index + 1}
+                      </div>
+                      <span className={`text-xs font-medium text-center ${
+                        isCompleted
+                          ? 'text-green-600 dark:text-green-400'
+                          : isCurrent
+                          ? 'text-primary-600 dark:text-primary-400'
+                          : 'text-gray-400 dark:text-stone-500'
+                      }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                    {index < DELIVERY_STEPS.length - 1 && (
+                      <div className={`flex-1 h-0.5 mx-2 mt-[-1.25rem] ${
+                        index < currentDeliveryIndex
+                          ? 'bg-green-500'
+                          : 'bg-gray-200 dark:bg-stone-700'
+                      }`} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+
+            {/* Update Delivery Action */}
+            {getNextDeliveryStatus() && (
+              <div className="border-t border-gray-100 dark:border-dark-border pt-4">
+                <textarea
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  placeholder="Add delivery notes (optional)..."
+                  rows={2}
+                  className="input-field mb-3"
+                />
+                <button
+                  onClick={handleUpdateDelivery}
+                  disabled={updatingDelivery}
+                  className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  {updatingDelivery ? 'Updating...' : getNextDeliveryButtonLabel()}
+                </button>
+              </div>
+            )}
+
+            {currentDeliveryStatus === 'delivered' && (
+              <div className="border-t border-gray-100 dark:border-dark-border pt-4">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <Package className="w-4 h-4" />
+                  <span className="text-sm font-medium">Delivery completed</span>
+                </div>
+              </div>
+            )}
+
+            {/* Delivery History */}
+            {deliveryUpdates.length > 0 && (
+              <div className="border-t border-gray-100 dark:border-dark-border pt-4 mt-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-dark-text mb-3">Delivery History</h3>
+                <div className="space-y-2">
+                  {deliveryUpdates.map(du => (
+                    <div key={du.id} className="flex items-start gap-3 text-sm">
+                      <div className={`badge text-xs ${
+                        du.status === 'delivered' ? 'delivery-delivered'
+                        : du.status === 'in_transit' ? 'delivery-in-transit'
+                        : du.status === 'dispatched' ? 'delivery-dispatched'
+                        : 'delivery-pending'
+                      }`}>
+                        {du.status === 'in_transit' ? 'IN TRANSIT' : du.status.toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-gray-600 dark:text-dark-text-secondary">
+                          by {du.user?.name || 'Unknown'}
+                        </span>
+                        {du.notes && (
+                          <p className="text-gray-500 dark:text-stone-400 text-xs mt-0.5">{du.notes}</p>
+                        )}
+                      </div>
+                      <span className="text-xs text-gray-400 dark:text-stone-500 whitespace-nowrap">
+                        {formatDateTime(du.updated_at)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

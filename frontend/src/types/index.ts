@@ -45,12 +45,27 @@ export interface ServiceRequest {
   status: RequestStatus;
   created_at: string;
   updated_at: string;
+  delivery_status?: DeliveryStatus;
   // Tracks which engineers have rejected this unassigned request
   rejected_by_engineers?: number[];
   // Populated fields
   customer?: User;
   asset?: Asset;
   assignment?: JobAssignment;
+}
+
+// Delivery Types
+export type DeliveryStatus = 'pending' | 'dispatched' | 'in_transit' | 'delivered';
+
+export interface DeliveryUpdate {
+  id: number;
+  request_id: number;
+  status: DeliveryStatus;
+  updated_by: number;
+  notes?: string;
+  updated_at: string;
+  // Populated fields
+  user?: User;
 }
 
 // Job Assignment Types

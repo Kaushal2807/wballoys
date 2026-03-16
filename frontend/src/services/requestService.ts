@@ -1,13 +1,13 @@
 import {
-  ServiceRequest, JobAssignment, JobUpdate, JobPhoto,
+  ServiceRequest, JobAssignment, JobUpdate, JobPhoto, DeliveryUpdate, DeliveryStatus,
   Asset, User, DashboardStats, CreateRequestPayload,
   RequestFilters, UrgencyLevel, RequestStatus,
 } from '../types';
 import {
   MOCK_USERS, MOCK_ASSETS, MOCK_REQUESTS, MOCK_ASSIGNMENTS,
-  MOCK_UPDATES, MOCK_PHOTOS,
+  MOCK_UPDATES, MOCK_PHOTOS, MOCK_DELIVERIES,
   getNextRequestId, getNextAssignmentId, getNextUpdateId, getNextPhotoId,
-  getNextUserId, getNextAssetId,
+  getNextUserId, getNextAssetId, getNextDeliveryId,
   generateTicketNumber,
 } from './mockData';
 
@@ -286,6 +286,56 @@ export const requestService = {
   getEngineers: async (): Promise<User[]> => {
     await delay(200);
     return MOCK_USERS.filter(u => u.role === 'engineer');
+  },
+
+  // ─── Delivery Operations ────────────────────────────────
+
+  getDeliveryUpdates: async (requestId: number): Promise<DeliveryUpdate[]> => {
+    await delay(200);
+    return MOCK_DELIVERIES
+      .filter(d => d.request_id === requestId)
+      .map(d => ({ ...d, user: MOCK_USERS.find(u => u.id === d.updated_by) }))
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  },
+
+  updateDeliveryStatus: async (
+    requestId: number, status: DeliveryStatus, userId: number, notes?: string
+  ): Promise<DeliveryUpdate> => {
+    await delay(300);
+    const request = MOCK_REQUESTS.find(r => r.id === requestId);
+    if (!request) throw new Error('Request not found');
+
+    request.delivery_status = status;
+    request.updated_at = new Date().toISOString();
+
+    const deliveryUpdate: DeliveryUpdate = {
+      id: getNextDeliveryId(),
+      request_id: requestId,
+      status,
+      updated_by: userId,
+      notes: notes || undefined,
+      updated_at: new Date().toISOString(),
+      user: MOCK_USERS.find(u => u.id === userId),
+    };
+    MOCK_DELIVERIES.push(deliveryUpdate);
+
+    // Also add a job update note for the timeline
+    const statusLabels: Record<DeliveryStatus, string> = {
+      pending: 'Pending',
+      dispatched: 'Dispatched',
+      in_transit: 'In Transit',
+      delivered: 'Delivered',
+    };
+    const user = MOCK_USERS.find(u => u.id === userId);
+    MOCK_UPDATES.push({
+      id: getNextUpdateId(),
+      request_id: requestId,
+      user_id: userId,
+      notes: `Delivery status updated to "${statusLabels[status]}" by ${user?.name || 'Unknown'}.${notes ? ` Notes: ${notes}` : ''}`,
+      created_at: new Date().toISOString(),
+    });
+
+    return deliveryUpdate;
   },
 
   // ─── Shared Operations ───────────────────────────────

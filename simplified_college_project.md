@@ -31,7 +31,14 @@ A simplified two-portal service management system for managing equipment service
 - Upload photos (1-3 images max)
 - Mark job as completed
 
-### 5. Basic Dashboard
+### 5. Delivery Tracking
+- Separate delivery status tracking per service request
+- 4-step delivery flow: Pending → Dispatched → In Transit → Delivered
+- Engineer and Manager can update delivery status with optional notes
+- Customer can view delivery progress (read-only)
+- Full delivery history with timestamps and user tracking
+
+### 6. Basic Dashboard
 - Customer: View my requests and status
 - Engineer: View all customer requests + view assigned jobs
 - Manager: View all jobs and simple statistics
@@ -79,6 +86,7 @@ New → Assigned → In Progress → Completed → Closed
   │  - Requests    │                   │  - Evidence Files │
   │  - Assignments │                   └───────────────────┘
   │  - Updates     │
+  │  - Deliveries  │
   └────────────────┘
 ```
 
@@ -142,6 +150,17 @@ New → Assigned → In Progress → Completed → Closed
          │ • notes              │   │ • photo_url           │
          │ • created_at         │   │ • uploaded_at         │
          └──────────────────────┘   └───────────────────────┘
+
+                     ┌──────────────────────────┐
+                     │   delivery_updates        │
+                     ├──────────────────────────┤
+                     │ • id (PK)                │
+                     │ • request_id (FK)        │
+                     │ • status                 │
+                     │ • updated_by (FK)        │
+                     │ • notes (nullable)       │
+                     │ • updated_at             │
+                     └──────────────────────────┘
 ```
 
 **Relationships:**
@@ -151,6 +170,7 @@ New → Assigned → In Progress → Completed → Closed
 - One Service Request → One Job Assignment
 - One Service Request → Many Job Updates
 - One Service Request → Many Job Photos
+- One Service Request → Many Delivery Updates
 - One Engineer (user) → Many Job Assignments
 
 ---
@@ -230,6 +250,7 @@ New → Assigned → In Progress → Completed → Closed
 │     View Request Details        │
 │ • Status: NEW/ASSIGNED/etc.     │
 │ • Assigned Engineer (if any)    │
+│ • Delivery Status (read-only)  │
 │ • Updates Timeline              │
 │ • Uploaded Photos               │
 │ • Close Job (if completed)      │
@@ -294,6 +315,15 @@ New → Assigned → In Progress → Completed → Closed
      │
      ▼
 ┌─────────────────────────┐
+│  Update Delivery Status │
+│ • Mark as Dispatched    │
+│ • Mark as In Transit    │
+│ • Mark as Delivered     │
+│ • Add delivery notes    │
+└────┬────────────────────┘
+     │
+     ▼
+┌─────────────────────────┐
 │  Mark as Completed      │
 │ • Final Notes           │
 │ • Confirm Completion    │
@@ -338,6 +368,7 @@ New → Assigned → In Progress → Completed → Closed
 │ • Track Progress       │
 │ • View Updates         │
 │ • See Photos           │
+│ • Update Delivery      │
 │ • Close Jobs           │
 └────────────────────────┘
 ```
@@ -489,6 +520,80 @@ New → Assigned → In Progress → Completed → Closed
 
 ---
 
+## 📦 Delivery Tracking Flow
+
+```
+┌──────────────────────────────────────────────────────────┐
+│              DELIVERY STATUS FLOW                         │
+│                                                           │
+│   ┌─────────┐    ┌────────────┐    ┌───────────┐    ┌──────────┐
+│   │ PENDING │───▶│ DISPATCHED │───▶│ IN TRANSIT│───▶│ DELIVERED│
+│   └─────────┘    └────────────┘    └───────────┘    └──────────┘
+│                                                           │
+│   Default state    Engineer/Mgr     Engineer/Mgr     Final state
+│   when job starts  clicks "Mark     clicks "Mark     (green ✓)
+│                    as Dispatched"   as In Transit"
+└──────────────────────────────────────────────────────────┘
+
+WHO CAN UPDATE:
+  ┌──────────────────┐    ┌──────────────────┐
+  │    Engineer      │    │    Manager       │
+  │  ✓ Can update    │    │  ✓ Can update    │
+  │  ✓ Add notes     │    │  ✓ Add notes     │
+  └──────────────────┘    └──────────────────┘
+
+  ┌──────────────────┐
+  │    Customer      │
+  │  ✓ Can VIEW only │
+  │  ✗ Cannot update │
+  └──────────────────┘
+
+WHEN VISIBLE:
+  • Delivery section appears when job status is "in_progress" or "completed"
+  • Not shown for "new", "assigned", or "closed" jobs
+
+API FLOW:
+  ┌───────────────────────────────────────────────────────┐
+  │  PATCH /api/requests/{id}/delivery                     │
+  │  Headers: { Authorization: "Bearer eyJ..." }           │
+  │  Body: {                                               │
+  │    "status": "dispatched",                             │
+  │    "notes": "Parts shipped via courier"                │
+  │  }                                                     │
+  └───────────────────┬───────────────────────────────────┘
+                      │
+                      ▼
+  ┌───────────────────────────────────────────────────────┐
+  │  Backend validates:                                    │
+  │  1. User is engineer or manager                        │
+  │  2. Request exists and is in_progress/completed        │
+  │  3. Transition is valid (pending → dispatched ✓)       │
+  │  4. Updates service_requests.delivery_status           │
+  │  5. Creates delivery_updates record                    │
+  │  6. Creates job_updates record (for timeline)          │
+  └───────────────────┬───────────────────────────────────┘
+                      │
+                      ▼
+  ┌───────────────────────────────────────────────────────┐
+  │  Response: 200 OK                                      │
+  │  {                                                     │
+  │    "id": 1,                                            │
+  │    "request_id": 42,                                   │
+  │    "status": "dispatched",                             │
+  │    "updated_by": 2,                                    │
+  │    "notes": "Parts shipped via courier",               │
+  │    "updated_at": "2024-03-15T14:30:00Z"                │
+  │  }                                                     │
+  └───────────────────────────────────────────────────────┘
+
+DATABASE TABLES AFFECTED:
+  • service_requests → delivery_status field updated
+  • delivery_updates → new row inserted (delivery history)
+  • job_updates → new row inserted (appears in timeline)
+```
+
+---
+
 ## 🔄 API Request Flow Example
 
 **Example: Customer Creates Service Request**
@@ -621,7 +726,7 @@ New → Assigned → In Progress → Completed → Closed
 
 ---
 
-## Simplified Data Model (6 Core Tables)
+## Simplified Data Model (7 Core Tables)
 
 ### 1. users
 ```
@@ -654,6 +759,7 @@ New → Assigned → In Progress → Completed → Closed
 - preferred_date
 - preferred_time
 - status (new/assigned/in_progress/completed/closed)
+- delivery_status (pending/dispatched/in_transit/delivered) - default: pending
 - created_at
 - updated_at
 ```
@@ -687,6 +793,16 @@ New → Assigned → In Progress → Completed → Closed
 - uploaded_at
 ```
 
+### 7. delivery_updates
+```
+- id (PK)
+- request_id (FK → service_requests)
+- status (pending/dispatched/in_transit/delivered)
+- updated_by (FK → users)
+- notes (nullable)
+- updated_at
+```
+
 ---
 
 ## Simplified API Endpoints
@@ -715,6 +831,12 @@ New → Assigned → In Progress → Completed → Closed
 ### Photos
 - POST `/api/requests/{id}/photos` (upload)
 - GET `/api/requests/{id}/photos` (list)
+
+### Delivery
+- GET `/api/requests/{id}/delivery` (get delivery updates history)
+- PATCH `/api/requests/{id}/delivery` (update delivery status - engineer/manager only)
+  - Body: `{ "status": "dispatched", "notes": "optional notes" }`
+  - Valid transitions: pending → dispatched → in_transit → delivered
 
 ### Dashboard
 - GET `/api/dashboard/stats` (simple counts by role)
@@ -782,6 +904,7 @@ app/
 │   ├── auth.py
 │   ├── requests.py          # includes GET /all for engineer access
 │   ├── assignments.py
+│   ├── delivery.py           # delivery status tracking
 │   └── dashboard.py
 ├── dependencies/
 │   └── auth.py (JWT verification)
@@ -818,6 +941,11 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(requests.router, prefix="/api/requests", tags=["Service Requests"])
 app.include_router(assignments.router, prefix="/api/assignments", tags=["Assignments"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+
+# Note: Delivery routes are nested under /api/requests in routers/delivery.py
+# Import and include them in routers/requests.py or mount separately:
+# from app.routers import delivery
+# app.include_router(delivery.router, prefix="/api/requests", tags=["Delivery"])
 
 @app.get("/")
 def root():
@@ -910,12 +1038,14 @@ class ServiceRequest(Base):
     preferred_date = Column(String, nullable=False)
     preferred_time = Column(String, nullable=False)
     status = Column(String, default="new", nullable=False)  # new, assigned, in_progress, completed, closed
+    delivery_status = Column(String, default="pending", nullable=False)  # pending, dispatched, in_transit, delivered
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     customer = relationship("User", foreign_keys=[customer_id])
     asset = relationship("Asset")
     assignment = relationship("JobAssignment", back_populates="request", uselist=False)
+    delivery_updates = relationship("DeliveryUpdate", back_populates="request", order_by="DeliveryUpdate.updated_at.desc()")
 
 class JobAssignment(Base):
     __tablename__ = "job_assignments"
@@ -953,6 +1083,19 @@ class JobPhoto(Base):
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
 
     uploader = relationship("User")
+
+class DeliveryUpdate(Base):
+    __tablename__ = "delivery_updates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("service_requests.id"), nullable=False)
+    status = Column(String, nullable=False)  # pending, dispatched, in_transit, delivered
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    notes = Column(String, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    request = relationship("ServiceRequest", back_populates="delivery_updates")
+    user = relationship("User")
 ```
 
 ### schemas/request.py
@@ -997,6 +1140,21 @@ class AssignmentResponse(BaseModel):
     assigned_at: datetime
     accepted_at: Optional[datetime]
     status: str
+
+    class Config:
+        from_attributes = True
+
+class DeliveryStatusUpdate(BaseModel):
+    status: str  # dispatched, in_transit, delivered
+    notes: Optional[str] = None
+
+class DeliveryUpdateResponse(BaseModel):
+    id: int
+    request_id: int
+    status: str
+    updated_by: int
+    notes: Optional[str]
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -1335,6 +1493,115 @@ def get_photos(
     ).filter(
         JobPhoto.request_id == request_id
     ).all()
+```
+
+### routers/delivery.py
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session, joinedload
+from datetime import datetime
+from app.database import get_db
+from app.models.user import User
+from app.models.service_request import ServiceRequest, DeliveryUpdate, JobUpdate
+from app.schemas.request import DeliveryStatusUpdate, DeliveryUpdateResponse
+from app.dependencies.auth import get_current_user, require_role
+
+router = APIRouter()
+
+# Valid delivery status transitions
+DELIVERY_TRANSITIONS = {
+    "pending": "dispatched",
+    "dispatched": "in_transit",
+    "in_transit": "delivered",
+}
+
+DELIVERY_STATUS_LABELS = {
+    "pending": "Pending",
+    "dispatched": "Dispatched",
+    "in_transit": "In Transit",
+    "delivered": "Delivered",
+}
+
+# ─── GET /api/requests/{id}/delivery (Get delivery history) ──
+@router.get("/{request_id}/delivery")
+def get_delivery_updates(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Returns delivery update history for a request."""
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    # Customers can only view their own requests
+    if current_user.role == "customer" and request.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return db.query(DeliveryUpdate).options(
+        joinedload(DeliveryUpdate.user)
+    ).filter(
+        DeliveryUpdate.request_id == request_id
+    ).order_by(DeliveryUpdate.updated_at.desc()).all()
+
+# ─── PATCH /api/requests/{id}/delivery (Update delivery status) ──
+@router.patch("/{request_id}/delivery")
+def update_delivery_status(
+    request_id: int,
+    data: DeliveryStatusUpdate,
+    current_user: User = Depends(require_role("engineer", "manager")),
+    db: Session = Depends(get_db),
+):
+    """
+    Advance delivery status to the next stage.
+    Only engineers and managers can update.
+    Valid transitions: pending → dispatched → in_transit → delivered
+    """
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    if request.status not in ("in_progress", "completed"):
+        raise HTTPException(status_code=400, detail="Delivery can only be updated for in-progress or completed jobs")
+
+    # Validate transition
+    current_delivery = request.delivery_status or "pending"
+    expected_next = DELIVERY_TRANSITIONS.get(current_delivery)
+    if not expected_next or data.status != expected_next:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid delivery transition: {current_delivery} → {data.status}. Expected: {current_delivery} → {expected_next}"
+        )
+
+    # Update the service request delivery_status
+    request.delivery_status = data.status
+    request.updated_at = datetime.utcnow()
+
+    # Create delivery update record
+    delivery_update = DeliveryUpdate(
+        request_id=request_id,
+        status=data.status,
+        updated_by=current_user.id,
+        notes=data.notes,
+    )
+    db.add(delivery_update)
+
+    # Also add a job update note for the timeline
+    status_label = DELIVERY_STATUS_LABELS.get(data.status, data.status)
+    note_text = f'Delivery status updated to "{status_label}" by {current_user.name}.'
+    if data.notes:
+        note_text += f" Notes: {data.notes}"
+
+    job_update = JobUpdate(
+        request_id=request_id,
+        user_id=current_user.id,
+        notes=note_text,
+    )
+    db.add(job_update)
+
+    db.commit()
+    db.refresh(delivery_update)
+    return delivery_update
 ```
 
 ### routers/assignments.py
@@ -1714,6 +1981,8 @@ CREATE INDEX idx_requests_customer ON service_requests(customer_id);
 CREATE INDEX idx_requests_status ON service_requests(status);
 CREATE INDEX idx_assignments_engineer ON job_assignments(engineer_id);
 CREATE INDEX idx_photos_request ON job_photos(request_id);
+CREATE INDEX idx_delivery_request ON delivery_updates(request_id);
+CREATE INDEX idx_delivery_status ON delivery_updates(status);
 ```
 
 ### Environment Variables Reference
@@ -1751,6 +2020,7 @@ CLOUDINARY_API_SECRET=your-api-secret
    - JWT authentication
    - File upload handling
    - Status workflow management
+   - Multi-step delivery tracking with progress visualization
 
 3. **Cloud Deployment**
    - Frontend on Vercel (free)
