@@ -1,4 +1,4 @@
-import { RequestStatus, UrgencyLevel, DeliveryStatus } from '../types';
+import { RequestStatus, UrgencyLevel, DeliveryStatus, ProductDeliveryStatus } from '../types';
 
 export const formatDate = (dateString: string): string => {
   const date = new Date(dateString);
@@ -54,6 +54,26 @@ export const getStatusLabel = (status: RequestStatus): string => {
 
 export const getDeliveryStatusLabel = (status: DeliveryStatus): string => {
   const map: Record<DeliveryStatus, string> = {
+    site_visited: 'SITE VISITED',
+    photos_taken: 'PHOTOS TAKEN',
+    next_date_given: 'NEXT DATE GIVEN',
+    service_solved: 'SERVICE SOLVED',
+  };
+  return map[status] || status.toUpperCase();
+};
+
+export const getDeliveryStatusColor = (status: DeliveryStatus): string => {
+  const map: Record<DeliveryStatus, string> = {
+    site_visited: 'delivery-site-visited',
+    photos_taken: 'delivery-photos-taken',
+    next_date_given: 'delivery-next-date-given',
+    service_solved: 'delivery-service-solved',
+  };
+  return map[status] || 'delivery-site-visited';
+};
+
+export const getProductDeliveryStatusLabel = (status: ProductDeliveryStatus): string => {
+  const map: Record<ProductDeliveryStatus, string> = {
     pending: 'PENDING',
     dispatched: 'DISPATCHED',
     in_transit: 'IN TRANSIT',
@@ -62,12 +82,12 @@ export const getDeliveryStatusLabel = (status: DeliveryStatus): string => {
   return map[status] || status.toUpperCase();
 };
 
-export const getDeliveryStatusColor = (status: DeliveryStatus): string => {
-  const map: Record<DeliveryStatus, string> = {
-    pending: 'delivery-pending',
-    dispatched: 'delivery-dispatched',
-    in_transit: 'delivery-in-transit',
-    delivered: 'delivery-delivered',
+export const getProductDeliveryStatusColor = (status: ProductDeliveryStatus): string => {
+  const map: Record<ProductDeliveryStatus, string> = {
+    pending: 'product-delivery-pending',
+    dispatched: 'product-delivery-dispatched',
+    in_transit: 'product-delivery-in-transit',
+    delivered: 'product-delivery-delivered',
   };
-  return map[status] || 'delivery-pending';
+  return map[status] || 'product-delivery-pending';
 };

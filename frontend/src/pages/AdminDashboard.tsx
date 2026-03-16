@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Navbar } from '@/components/common/Navbar';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { Users, Package, Plus } from 'lucide-react';
+import { Users, Package, Plus, Truck } from 'lucide-react';
 import { requestService } from '@/services/requestService';
 import { User, Asset } from '@/types';
 
 export const AdminDashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,6 +128,13 @@ export const AdminDashboard: React.FC = () => {
           <p className="text-gray-600 dark:text-dark-text-secondary">
             Manage users and equipment
           </p>
+          <button
+            onClick={() => navigate('/admin/product-deliveries')}
+            className="btn-primary text-sm flex items-center gap-2 mt-4"
+          >
+            <Truck className="w-4 h-4" />
+            Product Deliveries
+          </button>
         </div>
 
         {/* Stats */}

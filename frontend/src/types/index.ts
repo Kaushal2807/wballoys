@@ -55,7 +55,7 @@ export interface ServiceRequest {
 }
 
 // Delivery Types
-export type DeliveryStatus = 'pending' | 'dispatched' | 'in_transit' | 'delivered';
+export type DeliveryStatus = 'site_visited' | 'photos_taken' | 'next_date_given' | 'service_solved';
 
 export interface DeliveryUpdate {
   id: number;
@@ -138,6 +138,37 @@ export interface RequestFilters {
 export interface ApiError {
   detail: string;
   status?: number;
+}
+
+// Product Delivery Types
+export type ProductDeliveryStatus = 'pending' | 'dispatched' | 'in_transit' | 'delivered';
+
+export interface ProductOrder {
+  id: number;
+  order_number: string;
+  product_name: string;
+  model: string;
+  quantity: number;
+  customer_name: string;
+  delivery_address: string;
+  order_date: string;
+  expected_delivery_date: string;
+  delivery_status: ProductDeliveryStatus;
+  notes?: string;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateProductOrderPayload {
+  product_name: string;
+  model: string;
+  quantity: number;
+  customer_name: string;
+  delivery_address: string;
+  order_date: string;
+  expected_delivery_date: string;
+  notes?: string;
 }
 
 // Demo Credentials

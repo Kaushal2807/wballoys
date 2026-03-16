@@ -1,4 +1,4 @@
-import { User, Asset, ServiceRequest, JobAssignment, JobUpdate, JobPhoto, DeliveryUpdate } from '../types';
+import { User, Asset, ServiceRequest, JobAssignment, JobUpdate, JobPhoto, DeliveryUpdate, ProductOrder } from '../types';
 
 // ─── Mock Users ──────────────────────────────────────────
 export const MOCK_USERS: User[] = [
@@ -150,6 +150,42 @@ export const MOCK_PHOTOS: JobPhoto[] = [
 // ─── Mock Delivery Updates ──────────────────────────────
 export const MOCK_DELIVERIES: DeliveryUpdate[] = [];
 
+// ─── Mock Product Orders ─────────────────────────────────
+export const MOCK_PRODUCT_ORDERS: ProductOrder[] = [
+  {
+    id: 1, order_number: 'ORD-2024-0001', product_name: 'Industrial Welding Rod', model: 'WB-7018',
+    quantity: 500, customer_name: 'Tata Steel Ltd',
+    delivery_address: 'Plot 42, MIDC Industrial Area, Pune 411026',
+    order_date: '2024-03-01', expected_delivery_date: '2024-03-15',
+    delivery_status: 'delivered', notes: 'Delivered on time. Customer confirmed receipt.',
+    created_by: 3, created_at: '2024-03-01T09:00:00Z', updated_at: '2024-03-15T14:00:00Z',
+  },
+  {
+    id: 2, order_number: 'ORD-2024-0002', product_name: 'Alloy Filler Wire', model: 'WB-ER70S',
+    quantity: 200, customer_name: 'Bharat Forge',
+    delivery_address: '18 Mundhwa Road, Pune 411036',
+    order_date: '2024-03-05', expected_delivery_date: '2024-03-20',
+    delivery_status: 'in_transit', notes: 'Shipped via Bluedart. Tracking: BD12345678',
+    created_by: 3, created_at: '2024-03-05T10:30:00Z', updated_at: '2024-03-12T11:00:00Z',
+  },
+  {
+    id: 3, order_number: 'ORD-2024-0003', product_name: 'Flux Cored Wire', model: 'WB-E71T',
+    quantity: 100, customer_name: 'Larsen & Toubro',
+    delivery_address: 'L&T Business Park, Powai, Mumbai 400072',
+    order_date: '2024-03-10', expected_delivery_date: '2024-03-25',
+    delivery_status: 'dispatched',
+    created_by: 8, created_at: '2024-03-10T08:00:00Z', updated_at: '2024-03-11T09:00:00Z',
+  },
+  {
+    id: 4, order_number: 'ORD-2024-0004', product_name: 'Submerged Arc Welding Flux', model: 'WB-SAF10',
+    quantity: 50, customer_name: 'Godrej & Boyce',
+    delivery_address: 'Pirojshanagar, Vikhroli East, Mumbai 400079',
+    order_date: '2024-03-14', expected_delivery_date: '2024-03-28',
+    delivery_status: 'pending',
+    created_by: 8, created_at: '2024-03-14T11:00:00Z', updated_at: '2024-03-14T11:00:00Z',
+  },
+];
+
 // ─── Auto-increment counters ─────────────────────────────
 let nextRequestId = 11;
 let nextAssignmentId = 9;
@@ -167,6 +203,15 @@ export const getNextPhotoId = () => nextPhotoId++;
 export const getNextUserId = () => nextUserId++;
 export const getNextAssetId = () => nextAssetId++;
 export const getNextDeliveryId = () => nextDeliveryId++;
+
+let nextProductOrderId = 5;
+let nextOrderNum = 5;
+
+export const getNextProductOrderId = () => nextProductOrderId++;
+export const generateOrderNumber = (): string => {
+  const num = nextOrderNum++;
+  return `ORD-2024-${String(num).padStart(4, '0')}`;
+};
 
 export const generateTicketNumber = (): string => {
   const num = nextTicketNum++;

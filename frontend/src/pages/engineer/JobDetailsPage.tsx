@@ -125,13 +125,13 @@ export const JobDetailsPage: React.FC = () => {
   };
 
   const DELIVERY_STEPS: { status: DeliveryStatus; label: string }[] = [
-    { status: 'pending', label: 'Pending' },
-    { status: 'dispatched', label: 'Dispatched' },
-    { status: 'in_transit', label: 'In Transit' },
-    { status: 'delivered', label: 'Delivered' },
+    { status: 'site_visited', label: 'Site Visited' },
+    { status: 'photos_taken', label: 'Photos Taken' },
+    { status: 'next_date_given', label: 'Next Date Given' },
+    { status: 'service_solved', label: 'Service Solved' },
   ];
 
-  const currentDeliveryStatus = request?.delivery_status || 'pending';
+  const currentDeliveryStatus = request?.delivery_status || 'site_visited';
   const currentDeliveryIndex = DELIVERY_STEPS.findIndex(s => s.status === currentDeliveryStatus);
 
   const getNextDeliveryStatus = (): DeliveryStatus | null => {
@@ -144,10 +144,10 @@ export const JobDetailsPage: React.FC = () => {
     const next = getNextDeliveryStatus();
     if (!next) return '';
     const labels: Record<DeliveryStatus, string> = {
-      pending: '',
-      dispatched: 'Mark as Dispatched',
-      in_transit: 'Mark as In Transit',
-      delivered: 'Mark as Delivered',
+      site_visited: '',
+      photos_taken: 'Mark as Photos Taken',
+      next_date_given: 'Mark as Next Date Given',
+      service_solved: 'Mark as Service Solved',
     };
     return labels[next];
   };
@@ -159,10 +159,10 @@ export const JobDetailsPage: React.FC = () => {
     setUpdatingDelivery(true);
     try {
       await requestService.updateDeliveryStatus(request.id, nextStatus, user!.id, deliveryNotes.trim() || undefined);
-      toast.success(`Delivery status updated to "${DELIVERY_STEPS.find(s => s.status === nextStatus)?.label}"`);
+      toast.success(`Status updated to "${DELIVERY_STEPS.find(s => s.status === nextStatus)?.label}"`);
       setDeliveryNotes('');
       loadData();
-    } catch { toast.error('Failed to update delivery status'); }
+    } catch { toast.error('Failed to update status'); }
     finally { setUpdatingDelivery(false); }
   };
 
@@ -319,7 +319,7 @@ export const JobDetailsPage: React.FC = () => {
           <div className="card p-6 mb-6">
             <div className="flex items-center gap-2 mb-6">
               <Truck className="w-5 h-5 text-primary-600 dark:text-primary-400" />
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text">Delivery Status</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-dark-text">Updated Status</h2>
             </div>
 
             {/* Progress Steps */}
@@ -382,29 +382,32 @@ export const JobDetailsPage: React.FC = () => {
               </div>
             )}
 
-            {currentDeliveryStatus === 'delivered' && (
+            {currentDeliveryStatus === 'service_solved' && (
               <div className="border-t border-gray-100 dark:border-dark-border pt-4">
                 <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                   <Package className="w-4 h-4" />
-                  <span className="text-sm font-medium">Delivery completed</span>
+                  <span className="text-sm font-medium">Service Solved</span>
                 </div>
               </div>
             )}
 
-            {/* Delivery History */}
+            {/* Status History */}
             {deliveryUpdates.length > 0 && (
               <div className="border-t border-gray-100 dark:border-dark-border pt-4 mt-4">
-                <h3 className="text-sm font-medium text-gray-700 dark:text-dark-text mb-3">Delivery History</h3>
+                <h3 className="text-sm font-medium text-gray-700 dark:text-dark-text mb-3">Status History</h3>
                 <div className="space-y-2">
                   {deliveryUpdates.map(du => (
                     <div key={du.id} className="flex items-start gap-3 text-sm">
                       <div className={`badge text-xs ${
-                        du.status === 'delivered' ? 'delivery-delivered'
-                        : du.status === 'in_transit' ? 'delivery-in-transit'
-                        : du.status === 'dispatched' ? 'delivery-dispatched'
-                        : 'delivery-pending'
+                        du.status === 'service_solved' ? 'delivery-service-solved'
+                        : du.status === 'next_date_given' ? 'delivery-next-date-given'
+                        : du.status === 'photos_taken' ? 'delivery-photos-taken'
+                        : 'delivery-site-visited'
                       }`}>
-                        {du.status === 'in_transit' ? 'IN TRANSIT' : du.status.toUpperCase()}
+                        {du.status === 'site_visited' ? 'SITE VISITED'
+                        : du.status === 'photos_taken' ? 'PHOTOS TAKEN'
+                        : du.status === 'next_date_given' ? 'NEXT DATE GIVEN'
+                        : 'SERVICE SOLVED'}
                       </div>
                       <div className="flex-1">
                         <span className="text-gray-600 dark:text-dark-text-secondary">

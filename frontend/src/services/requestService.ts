@@ -2,12 +2,15 @@ import {
   ServiceRequest, JobAssignment, JobUpdate, JobPhoto, DeliveryUpdate, DeliveryStatus,
   Asset, User, DashboardStats, CreateRequestPayload,
   RequestFilters, UrgencyLevel, RequestStatus,
+  ProductOrder, ProductDeliveryStatus, CreateProductOrderPayload,
 } from '../types';
 import {
   MOCK_USERS, MOCK_ASSETS, MOCK_REQUESTS, MOCK_ASSIGNMENTS,
   MOCK_UPDATES, MOCK_PHOTOS, MOCK_DELIVERIES,
+  MOCK_PRODUCT_ORDERS,
   getNextRequestId, getNextAssignmentId, getNextUpdateId, getNextPhotoId,
   getNextUserId, getNextAssetId, getNextDeliveryId,
+  getNextProductOrderId, generateOrderNumber,
   generateTicketNumber,
 } from './mockData';
 
@@ -321,17 +324,17 @@ export const requestService = {
 
     // Also add a job update note for the timeline
     const statusLabels: Record<DeliveryStatus, string> = {
-      pending: 'Pending',
-      dispatched: 'Dispatched',
-      in_transit: 'In Transit',
-      delivered: 'Delivered',
+      site_visited: 'Site Visited',
+      photos_taken: 'Photos Taken',
+      next_date_given: 'Next Date Given',
+      service_solved: 'Service Solved',
     };
     const user = MOCK_USERS.find(u => u.id === userId);
     MOCK_UPDATES.push({
       id: getNextUpdateId(),
       request_id: requestId,
       user_id: userId,
-      notes: `Delivery status updated to "${statusLabels[status]}" by ${user?.name || 'Unknown'}.${notes ? ` Notes: ${notes}` : ''}`,
+      notes: `Status updated to "${statusLabels[status]}" by ${user?.name || 'Unknown'}.${notes ? ` Notes: ${notes}` : ''}`,
       created_at: new Date().toISOString(),
     });
 
@@ -426,5 +429,56 @@ export const requestService = {
   getCustomers: async (): Promise<User[]> => {
     await delay(200);
     return MOCK_USERS.filter(u => u.role === 'customer');
+  },
+
+  // ─── Product Delivery Operations ───────────────────────
+
+  getAllProductOrders: async (): Promise<ProductOrder[]> => {
+    await delay(300);
+    return [...MOCK_PRODUCT_ORDERS]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  },
+
+  getProductOrderById: async (orderId: number): Promise<ProductOrder> => {
+    await delay(300);
+    const order = MOCK_PRODUCT_ORDERS.find(o => o.id === orderId);
+    if (!order) throw new Error('Product order not found');
+    return { ...order };
+  },
+
+  createProductOrder: async (data: CreateProductOrderPayload, createdBy: number): Promise<ProductOrder> => {
+    await delay(400);
+    const newOrder: ProductOrder = {
+      id: getNextProductOrderId(),
+      order_number: generateOrderNumber(),
+      product_name: data.product_name,
+      model: data.model,
+      quantity: data.quantity,
+      customer_name: data.customer_name,
+      delivery_address: data.delivery_address,
+      order_date: data.order_date,
+      expected_delivery_date: data.expected_delivery_date,
+      delivery_status: 'pending',
+      notes: data.notes || undefined,
+      created_by: createdBy,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    MOCK_PRODUCT_ORDERS.unshift(newOrder);
+    return { ...newOrder };
+  },
+
+  updateProductDeliveryStatus: async (
+    orderId: number, status: ProductDeliveryStatus, notes?: string
+  ): Promise<ProductOrder> => {
+    await delay(300);
+    const order = MOCK_PRODUCT_ORDERS.find(o => o.id === orderId);
+    if (!order) throw new Error('Product order not found');
+    order.delivery_status = status;
+    order.updated_at = new Date().toISOString();
+    if (notes !== undefined) {
+      order.notes = notes;
+    }
+    return { ...order };
   },
 };

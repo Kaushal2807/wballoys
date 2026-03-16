@@ -26,6 +26,9 @@ import { JobDetailsPage } from '@/pages/engineer/JobDetailsPage';
 import { ManagerJobsPage } from '@/pages/manager/ManagerJobsPage';
 import { ManagerJobDetailsPage } from '@/pages/manager/ManagerJobDetailsPage';
 
+// Product Delivery Pages
+import { ProductDeliveriesPage } from '@/pages/ProductDeliveriesPage';
+
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 // Protected Route Component
@@ -175,6 +178,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ManagerJobDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Product Delivery Routes */}
+      <Route
+        path="/manager/product-deliveries"
+        element={
+          <ProtectedRoute>
+            <ProductDeliveriesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/product-deliveries"
+        element={
+          <ProtectedRoute>
+            <ProductDeliveriesPage />
           </ProtectedRoute>
         }
       />
