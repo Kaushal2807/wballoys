@@ -759,7 +759,7 @@ DATABASE TABLES AFFECTED:
 - preferred_date
 - preferred_time
 - status (new/assigned/in_progress/completed/closed)
-- delivery_status (pending/dispatched/in_transit/delivered) - default: pending
+- delivery_status (site_visited/photos_taken/next_date_given/service_solved) - default: site_visited
 - created_at
 - updated_at
 ```
@@ -797,9 +797,27 @@ DATABASE TABLES AFFECTED:
 ```
 - id (PK)
 - request_id (FK → service_requests)
-- status (pending/dispatched/in_transit/delivered)
+- status (site_visited/photos_taken/next_date_given/service_solved)
 - updated_by (FK → users)
 - notes (nullable)
+- updated_at
+```
+
+### 8. product_orders
+```
+- id (PK)
+- order_number (unique, auto-generated: ORD-2024-XXXX)
+- product_name
+- model
+- quantity
+- customer_name
+- delivery_address
+- order_date
+- expected_delivery_date
+- delivery_status (pending/dispatched/in_transit/delivered) - default: pending
+- notes (nullable)
+- created_by (FK → users, manager/admin who created)
+- created_at
 - updated_at
 ```
 
@@ -835,6 +853,15 @@ DATABASE TABLES AFFECTED:
 ### Delivery
 - GET `/api/requests/{id}/delivery` (get delivery updates history)
 - PATCH `/api/requests/{id}/delivery` (update delivery status - engineer/manager only)
+  - Body: `{ "status": "photos_taken", "notes": "optional notes" }`
+  - Valid transitions: site_visited → photos_taken → next_date_given → service_solved
+
+### Product Orders (Manager/Admin only)
+- GET `/api/product-orders` (list all product orders)
+- GET `/api/product-orders/{id}` (get single order details)
+- POST `/api/product-orders` (create new product order)
+  - Body: `{ "product_name": "...", "model": "...", "quantity": 100, "customer_name": "...", "delivery_address": "...", "order_date": "2024-03-14", "expected_delivery_date": "2024-03-28", "notes": "optional" }`
+- PATCH `/api/product-orders/{id}/status` (update delivery status)
   - Body: `{ "status": "dispatched", "notes": "optional notes" }`
   - Valid transitions: pending → dispatched → in_transit → delivered
 
@@ -905,6 +932,7 @@ app/
 │   ├── requests.py          # includes GET /all for engineer access
 │   ├── assignments.py
 │   ├── delivery.py           # delivery status tracking
+│   ├── product_orders.py     # product delivery tracking (manager/admin)
 │   └── dashboard.py
 ├── dependencies/
 │   └── auth.py (JWT verification)
@@ -920,7 +948,7 @@ app/
 ```python
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth, requests, assignments, dashboard
+from app.routers import auth, requests, assignments, dashboard, product_orders
 from app.database import engine, Base
 
 # Create database tables
@@ -941,6 +969,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(requests.router, prefix="/api/requests", tags=["Service Requests"])
 app.include_router(assignments.router, prefix="/api/assignments", tags=["Assignments"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(product_orders.router, prefix="/api/product-orders", tags=["Product Orders"])
 
 # Note: Delivery routes are nested under /api/requests in routers/delivery.py
 # Import and include them in routers/requests.py or mount separately:
@@ -1038,7 +1067,7 @@ class ServiceRequest(Base):
     preferred_date = Column(String, nullable=False)
     preferred_time = Column(String, nullable=False)
     status = Column(String, default="new", nullable=False)  # new, assigned, in_progress, completed, closed
-    delivery_status = Column(String, default="pending", nullable=False)  # pending, dispatched, in_transit, delivered
+    delivery_status = Column(String, default="site_visited", nullable=False)  # site_visited, photos_taken, next_date_given, service_solved
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -1089,13 +1118,33 @@ class DeliveryUpdate(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     request_id = Column(Integer, ForeignKey("service_requests.id"), nullable=False)
-    status = Column(String, nullable=False)  # pending, dispatched, in_transit, delivered
+    status = Column(String, nullable=False)  # site_visited, photos_taken, next_date_given, service_solved
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     notes = Column(String, nullable=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
 
     request = relationship("ServiceRequest", back_populates="delivery_updates")
     user = relationship("User")
+
+class ProductOrder(Base):
+    __tablename__ = "product_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_number = Column(String, unique=True, index=True, nullable=False)
+    product_name = Column(String, nullable=False)
+    model = Column(String, nullable=False)
+    quantity = Column(Integer, nullable=False)
+    customer_name = Column(String, nullable=False)
+    delivery_address = Column(String, nullable=False)
+    order_date = Column(String, nullable=False)
+    expected_delivery_date = Column(String, nullable=False)
+    delivery_status = Column(String, default="pending", nullable=False)  # pending, dispatched, in_transit, delivered
+    notes = Column(String, nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    creator = relationship("User")
 ```
 
 ### schemas/request.py
@@ -1145,7 +1194,7 @@ class AssignmentResponse(BaseModel):
         from_attributes = True
 
 class DeliveryStatusUpdate(BaseModel):
-    status: str  # dispatched, in_transit, delivered
+    status: str  # photos_taken, next_date_given, service_solved
     notes: Optional[str] = None
 
 class DeliveryUpdateResponse(BaseModel):
@@ -1510,16 +1559,16 @@ router = APIRouter()
 
 # Valid delivery status transitions
 DELIVERY_TRANSITIONS = {
-    "pending": "dispatched",
-    "dispatched": "in_transit",
-    "in_transit": "delivered",
+    "site_visited": "photos_taken",
+    "photos_taken": "next_date_given",
+    "next_date_given": "service_solved",
 }
 
 DELIVERY_STATUS_LABELS = {
-    "pending": "Pending",
-    "dispatched": "Dispatched",
-    "in_transit": "In Transit",
-    "delivered": "Delivered",
+    "site_visited": "Site Visited",
+    "photos_taken": "Photos Taken",
+    "next_date_given": "Next Date Given",
+    "service_solved": "Service Solved",
 }
 
 # ─── GET /api/requests/{id}/delivery (Get delivery history) ──
@@ -1555,7 +1604,7 @@ def update_delivery_status(
     """
     Advance delivery status to the next stage.
     Only engineers and managers can update.
-    Valid transitions: pending → dispatched → in_transit → delivered
+    Valid transitions: site_visited → photos_taken → next_date_given → service_solved
     """
     request = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
     if not request:
@@ -1565,7 +1614,7 @@ def update_delivery_status(
         raise HTTPException(status_code=400, detail="Delivery can only be updated for in-progress or completed jobs")
 
     # Validate transition
-    current_delivery = request.delivery_status or "pending"
+    current_delivery = request.delivery_status or "site_visited"
     expected_next = DELIVERY_TRANSITIONS.get(current_delivery)
     if not expected_next or data.status != expected_next:
         raise HTTPException(
@@ -1588,7 +1637,7 @@ def update_delivery_status(
 
     # Also add a job update note for the timeline
     status_label = DELIVERY_STATUS_LABELS.get(data.status, data.status)
-    note_text = f'Delivery status updated to "{status_label}" by {current_user.name}.'
+    note_text = f'Status updated to "{status_label}" by {current_user.name}.'
     if data.notes:
         note_text += f" Notes: {data.notes}"
 
@@ -1602,6 +1651,140 @@ def update_delivery_status(
     db.commit()
     db.refresh(delivery_update)
     return delivery_update
+```
+
+### routers/product_orders.py
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from datetime import datetime
+from app.database import get_db
+from app.models.user import User
+from app.models.service_request import ProductOrder
+from app.dependencies.auth import get_current_user, require_role
+from pydantic import BaseModel
+from typing import Optional
+
+router = APIRouter()
+
+# ─── Schemas ──────────────────────────────────────────
+class ProductOrderCreate(BaseModel):
+    product_name: str
+    model: str
+    quantity: int
+    customer_name: str
+    delivery_address: str
+    order_date: str
+    expected_delivery_date: str
+    notes: Optional[str] = None
+
+class ProductOrderStatusUpdate(BaseModel):
+    status: str  # pending, dispatched, in_transit, delivered
+    notes: Optional[str] = None
+
+# Valid delivery status transitions
+DELIVERY_TRANSITIONS = {
+    "pending": "dispatched",
+    "dispatched": "in_transit",
+    "in_transit": "delivered",
+    "delivered": None,
+}
+
+# Counter for order number generation (in production, use database sequence)
+import threading
+_order_counter = 1
+_counter_lock = threading.Lock()
+
+def generate_order_number() -> str:
+    global _order_counter
+    with _counter_lock:
+        num = _order_counter
+        _order_counter += 1
+    return f"ORD-2024-{str(num).zfill(4)}"
+
+# ─── GET /api/product-orders (List all product orders) ──
+@router.get("/")
+def get_all_product_orders(
+    current_user: User = Depends(require_role("manager", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Returns all product orders, sorted by created_at desc."""
+    orders = db.query(ProductOrder).order_by(ProductOrder.created_at.desc()).all()
+    return orders
+
+# ─── GET /api/product-orders/{id} (Get single order) ──
+@router.get("/{order_id}")
+def get_product_order(
+    order_id: int,
+    current_user: User = Depends(require_role("manager", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Returns a single product order by ID."""
+    order = db.query(ProductOrder).filter(ProductOrder.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Product order not found")
+    return order
+
+# ─── POST /api/product-orders (Create new order) ──
+@router.post("/", status_code=201)
+def create_product_order(
+    data: ProductOrderCreate,
+    current_user: User = Depends(require_role("manager", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Creates a new product order. Only managers and admins can create."""
+    new_order = ProductOrder(
+        order_number=generate_order_number(),
+        product_name=data.product_name,
+        model=data.model,
+        quantity=data.quantity,
+        customer_name=data.customer_name,
+        delivery_address=data.delivery_address,
+        order_date=data.order_date,
+        expected_delivery_date=data.expected_delivery_date,
+        delivery_status="pending",
+        notes=data.notes,
+        created_by=current_user.id,
+    )
+    db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
+    return new_order
+
+# ─── PATCH /api/product-orders/{id}/status (Update delivery status) ──
+@router.patch("/{order_id}/status")
+def update_product_order_status(
+    order_id: int,
+    data: ProductOrderStatusUpdate,
+    current_user: User = Depends(require_role("manager", "admin")),
+    db: Session = Depends(get_db),
+):
+    """
+    Advance product order delivery status to the next stage.
+    Valid transitions: pending → dispatched → in_transit → delivered
+    """
+    order = db.query(ProductOrder).filter(ProductOrder.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Product order not found")
+
+    # Validate transition
+    current_status = order.delivery_status or "pending"
+    expected_next = DELIVERY_TRANSITIONS.get(current_status)
+    if not expected_next or data.status != expected_next:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid delivery transition: {current_status} → {data.status}. Expected: {current_status} → {expected_next}"
+        )
+
+    # Update the order
+    order.delivery_status = data.status
+    order.updated_at = datetime.utcnow()
+    if data.notes is not None:
+        order.notes = data.notes
+
+    db.commit()
+    db.refresh(order)
+    return order
 ```
 
 ### routers/assignments.py
