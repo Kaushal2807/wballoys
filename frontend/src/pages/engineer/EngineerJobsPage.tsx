@@ -72,6 +72,28 @@ export const EngineerJobsPage: React.FC = () => {
     }
   };
 
+  const handleSelfAccept = async (requestId: number) => {
+    try {
+      await requestService.engineerSelfAccept(requestId, user!.id);
+      toast.success('Request accepted! It has been added to your jobs.');
+      loadJobs();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to accept request';
+      toast.error(msg);
+      loadJobs(); // refresh in case someone else just claimed it
+    }
+  };
+
+  const handleRejectNew = async (requestId: number) => {
+    try {
+      await requestService.engineerRejectNew(requestId, user!.id);
+      toast.info('Request rejected');
+      loadJobs();
+    } catch {
+      toast.error('Failed to reject request');
+    }
+  };
+
   const myAssignedIds = new Set(jobs.map(j => j.id));
 
   const getFilteredData = () => {
@@ -164,6 +186,9 @@ export const EngineerJobsPage: React.FC = () => {
                 request={job}
                 onAccept={activeTab === 'my' ? handleAccept : undefined}
                 onReject={activeTab === 'my' ? handleReject : undefined}
+                onSelfAccept={activeTab === 'all' ? handleSelfAccept : undefined}
+                onRejectNew={activeTab === 'all' ? handleRejectNew : undefined}
+                rejectedByMe={activeTab === 'all' ? job.rejected_by_engineers?.includes(user!.id) : undefined}
                 onViewDetails={(id) => navigate(`/engineer/jobs/${id}`)}
                 onMarkComplete={activeTab === 'my' ? handleMarkComplete : undefined}
                 isMyJob={myAssignedIds.has(job.id)}

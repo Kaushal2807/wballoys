@@ -60,6 +60,28 @@ export const JobDetailsPage: React.FC = () => {
     } catch { toast.error('Failed to reject job'); }
   };
 
+  const handleSelfAccept = async () => {
+    if (!request) return;
+    try {
+      await requestService.engineerSelfAccept(request.id, user!.id);
+      toast.success('Request accepted! It has been added to your jobs.');
+      loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to accept request';
+      toast.error(msg);
+      loadData();
+    }
+  };
+
+  const handleRejectNew = async () => {
+    if (!request) return;
+    try {
+      await requestService.engineerRejectNew(request.id, user!.id);
+      toast.info('Request rejected');
+      loadData();
+    } catch { toast.error('Failed to reject request'); }
+  };
+
   const handleStartWork = async () => {
     if (!request) return;
     try {
@@ -110,6 +132,8 @@ export const JobDetailsPage: React.FC = () => {
   const isPending = request.assignment?.status === 'pending';
   const isAssigned = request.status === 'assigned' && request.assignment?.status === 'accepted';
   const isInProgress = request.status === 'in_progress';
+  const isNewUnassigned = request.status === 'new' && !request.assignment;
+  const rejectedByMe = request.rejected_by_engineers?.includes(user?.id ?? -1);
 
   return (
     <div className="min-h-screen bg-cream dark:bg-dark-bg">
@@ -130,7 +154,22 @@ export const JobDetailsPage: React.FC = () => {
               </div>
             </div>
             {/* Action Buttons */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              {isNewUnassigned && !rejectedByMe && (
+                <>
+                  <button onClick={handleSelfAccept} className="text-sm font-medium py-2 px-4 rounded-lg transition-colors bg-green-600 hover:bg-green-700 text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 flex items-center gap-2">
+                    <ThumbsUp className="w-4 h-4" /> Accept Request
+                  </button>
+                  <button onClick={handleRejectNew} className="btn-secondary flex items-center gap-2 text-sm">
+                    <ThumbsDown className="w-4 h-4" /> Reject
+                  </button>
+                </>
+              )}
+              {isNewUnassigned && rejectedByMe && (
+                <span className="text-sm text-gray-400 dark:text-stone-500 italic py-2">
+                  You have rejected this request
+                </span>
+              )}
               {isPending && (
                 <>
                   <button onClick={handleAccept} className="btn-primary flex items-center gap-2 text-sm">

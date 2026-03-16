@@ -67,6 +67,28 @@ export const EngineerDashboard: React.FC = () => {
     }
   };
 
+  const handleSelfAccept = async (requestId: number) => {
+    try {
+      await requestService.engineerSelfAccept(requestId, user!.id);
+      toast.success('Request accepted! It has been added to your jobs.');
+      loadData();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to accept request';
+      toast.error(msg);
+      loadData();
+    }
+  };
+
+  const handleRejectNew = async (requestId: number) => {
+    try {
+      await requestService.engineerRejectNew(requestId, user!.id);
+      toast.info('Request rejected');
+      loadData();
+    } catch {
+      toast.error('Failed to reject request');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-cream dark:bg-dark-bg">
@@ -76,7 +98,11 @@ export const EngineerDashboard: React.FC = () => {
     );
   }
 
-  const pendingCount = jobs.filter(j => j.assignment?.status === 'pending').length;
+  const managerAssignedPending = jobs.filter(j => j.assignment?.status === 'pending').length;
+  const availableNewRequests = allRequests.filter(
+    r => r.status === 'new' && !r.assignment && !r.rejected_by_engineers?.includes(user!.id)
+  ).length;
+  const pendingCount = managerAssignedPending + availableNewRequests;
   const myAssignedIds = new Set(jobs.map(j => j.id));
   const recentJobs = jobs.slice(0, 4);
   const recentAllRequests = allRequests.slice(0, 4);
@@ -212,14 +238,12 @@ export const EngineerDashboard: React.FC = () => {
                             </button>
                           </>
                         )}
-                        {!isPending && (
-                          <button
-                            onClick={() => navigate(`/engineer/jobs/${job.id}`)}
-                            className="btn-primary text-xs py-1 px-3"
-                          >
-                            View Details
-                          </button>
-                        )}
+                        <button
+                          onClick={() => navigate(`/engineer/jobs/${job.id}`)}
+                          className="btn-primary text-xs py-1 px-3"
+                        >
+                          View Details
+                        </button>
                         {isInProgress && !isPending && (
                           <button
                             onClick={() => handleMarkComplete(job.id)}
@@ -259,12 +283,18 @@ export const EngineerDashboard: React.FC = () => {
               <div className="space-y-4">
                 {recentAllRequests.map(req => {
                   const isMyJob = myAssignedIds.has(req.id);
+                  const isNewUnassigned = req.status === 'new' && !req.assignment;
+                  const rejectedByMe = req.rejected_by_engineers?.includes(user!.id);
 
                   return (
                     <div
                       key={req.id}
                       className={`border rounded-lg p-4 hover:shadow-md transition-shadow ${
-                        isMyJob
+                        isNewUnassigned && !rejectedByMe
+                          ? 'border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10'
+                          : isNewUnassigned && rejectedByMe
+                          ? 'border border-gray-200 dark:border-dark-border opacity-50'
+                          : isMyJob
                           ? 'border-primary-200 dark:border-primary-800 bg-primary-50/50 dark:bg-primary-900/10'
                           : 'border-gray-200 dark:border-dark-border'
                       }`}
@@ -274,7 +304,17 @@ export const EngineerDashboard: React.FC = () => {
                           {req.ticket_number}
                         </span>
                         <UrgencyBadge urgency={req.urgency} />
-                        <StatusBadge status={req.status} />
+                        {isNewUnassigned && !rejectedByMe ? (
+                          <span className="badge bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                            AVAILABLE
+                          </span>
+                        ) : isNewUnassigned && rejectedByMe ? (
+                          <span className="badge bg-gray-200 text-gray-600 dark:bg-stone-700 dark:text-stone-400">
+                            REJECTED BY YOU
+                          </span>
+                        ) : (
+                          <StatusBadge status={req.status} />
+                        )}
                         {isMyJob && (
                           <span className="badge bg-primary-100 text-primary-800 dark:bg-primary-900/20 dark:text-primary-300">
                             MY JOB
@@ -293,12 +333,35 @@ export const EngineerDashboard: React.FC = () => {
                           </>
                         )}
                       </div>
-                      <button
-                        onClick={() => navigate(`/engineer/jobs/${req.id}`)}
-                        className="btn-primary text-xs py-1 px-3"
-                      >
-                        View Details
-                      </button>
+                      <div className="flex gap-2 flex-wrap">
+                        {isNewUnassigned && !rejectedByMe && (
+                          <>
+                            <button
+                              onClick={() => handleSelfAccept(req.id)}
+                              className="text-xs font-medium py-1 px-3 rounded-lg transition-colors bg-green-600 hover:bg-green-700 text-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectNew(req.id)}
+                              className="btn-secondary text-xs py-1 px-3"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {isNewUnassigned && rejectedByMe && (
+                          <span className="text-xs text-gray-400 dark:text-stone-500 italic py-1">
+                            You rejected this request
+                          </span>
+                        )}
+                        <button
+                          onClick={() => navigate(`/engineer/jobs/${req.id}`)}
+                          className="btn-primary text-xs py-1 px-3"
+                        >
+                          View Details
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

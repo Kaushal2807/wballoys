@@ -125,6 +125,57 @@ export const requestService = {
     return { ...assignment };
   },
 
+  // Engineer self-claims a new unassigned request (no manager assignment needed)
+  engineerSelfAccept: async (requestId: number, engineerId: number): Promise<ServiceRequest> => {
+    await delay(300);
+    const request = MOCK_REQUESTS.find(r => r.id === requestId);
+    if (!request) throw new Error('Request not found');
+    if (request.status !== 'new') throw new Error('This request is no longer available');
+    const existing = MOCK_ASSIGNMENTS.find(
+      a => a.request_id === requestId && (a.status === 'pending' || a.status === 'accepted')
+    );
+    if (existing) throw new Error('Another engineer has already claimed this request');
+
+    const assignment: JobAssignment = {
+      id: getNextAssignmentId(),
+      request_id: requestId,
+      engineer_id: engineerId,
+      assigned_by: engineerId,
+      assigned_at: new Date().toISOString(),
+      accepted_at: new Date().toISOString(),
+      status: 'accepted',
+    };
+    MOCK_ASSIGNMENTS.push(assignment);
+
+    request.status = 'in_progress';
+    request.updated_at = new Date().toISOString();
+
+    const engineer = MOCK_USERS.find(u => u.id === engineerId);
+    MOCK_UPDATES.push({
+      id: getNextUpdateId(),
+      request_id: requestId,
+      user_id: engineerId,
+      notes: `${engineer?.name || 'Engineer'} accepted and self-assigned this job.`,
+      created_at: new Date().toISOString(),
+    });
+
+    return populateRequest(request);
+  },
+
+  // Engineer rejects a new unassigned request (stays visible but greyed-out for them)
+  engineerRejectNew: async (requestId: number, engineerId: number): Promise<ServiceRequest> => {
+    await delay(200);
+    const request = MOCK_REQUESTS.find(r => r.id === requestId);
+    if (!request) throw new Error('Request not found');
+    if (!request.rejected_by_engineers) {
+      request.rejected_by_engineers = [];
+    }
+    if (!request.rejected_by_engineers.includes(engineerId)) {
+      request.rejected_by_engineers.push(engineerId);
+    }
+    return populateRequest(request);
+  },
+
   startWork: async (requestId: number): Promise<ServiceRequest> => {
     await delay(300);
     const request = MOCK_REQUESTS.find(r => r.id === requestId);

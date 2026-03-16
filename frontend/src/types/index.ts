@@ -45,6 +45,8 @@ export interface ServiceRequest {
   status: RequestStatus;
   created_at: string;
   updated_at: string;
+  // Tracks which engineers have rejected this unassigned request
+  rejected_by_engineers?: number[];
   // Populated fields
   customer?: User;
   asset?: Asset;

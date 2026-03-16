@@ -521,7 +521,7 @@ New → Assigned → In Progress → Completed → Closed
 │     • Extract token                                         │
 │     • Verify signature                                      │
 │     • Get user_id and role                                  │
-│     ✓ user_id: 10, role: "customer"                        │
+│     ✓ user_id: 10, role: "customer"                         │
 │                                                             │
 │  2. Authorization Check                                     │
 │     • Check if role = "customer"                            │
@@ -534,7 +534,7 @@ New → Assigned → In Progress → Completed → Closed
 │     ✓ Valid                                                 │
 │                                                             │
 │  4. Business Logic                                          │
-│     • Generate ticket_number: "REQ-2024-0042"              │
+│     • Generate ticket_number: "REQ-2024-0042"               │
 │     • Set status: "new"                                     │
 │     • Set created_at: now()                                 │
 │     • Validate preferred_date is future date                │
@@ -550,10 +550,10 @@ New → Assigned → In Progress → Completed → Closed
 │    description, urgency, preferred_date,                    │
 │    preferred_time, status, created_at                       │
 │  ) VALUES (                                                 │
-│    'REQ-2024-0042', 10, 5,                                 │
-│    'AC not cooling', 'high',                               │
-│    '2024-03-15', '10:00',                                  │
-│    'new', '2024-03-14 10:30'                               │
+│    'REQ-2024-0042', 10, 5,                                  │
+│    'AC not cooling', 'high',                                │
+│    '2024-03-15', '10:00',                                   │
+│    'new', '2024-03-14 10:30'                                │
 │  )                                                          │
 │  RETURNING *;                                               │
 │                                                             │
@@ -567,7 +567,7 @@ New → Assigned → In Progress → Completed → Closed
 │  Response: 201 Created                                      │
 │  Body: {                                                    │
 │    id: 42,                                                  │
-│    ticket_number: "REQ-2024-0042",                         │
+│    ticket_number: "REQ-2024-0042",                          │
 │    customer_id: 10,                                         │
 │    asset_id: 5,                                             │
 │    description: "AC not cooling",                           │
@@ -575,7 +575,7 @@ New → Assigned → In Progress → Completed → Closed
 │    preferred_date: "2024-03-15",                            │
 │    preferred_time: "10:00",                                 │
 │    status: "new",                                           │
-│    created_at: "2024-03-14T10:30:00Z"                      │
+│    created_at: "2024-03-14T10:30:00Z"                       │
 │  }                                                          │
 │                                                             │
 └────────────────────────┬────────────────────────────────────┘
@@ -587,7 +587,7 @@ New → Assigned → In Progress → Completed → Closed
 │                                                             │
 │  • Display success notification                             │
 │  • Redirect to request details page                         │
-│  • Show ticket number: REQ-2024-0042                       │
+│  • Show ticket number: REQ-2024-0042                        │
 │  • Update request list                                      │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
