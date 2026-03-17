@@ -31,19 +31,10 @@ def serialize_asset(asset):
 # ─── GET /api/assets (List assets, filterable by customer_id) ──
 @router.get("/")
 def get_assets(
-    customer_id: int = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Asset)
-
-    # Customers can only see their own assets
-    if current_user.role == "customer":
-        query = query.filter(Asset.customer_id == current_user.id)
-    elif customer_id:
-        query = query.filter(Asset.customer_id == customer_id)
-
-    assets = query.all()
+    assets = db.query(Asset).all()
     return [serialize_asset(a) for a in assets]
 
 

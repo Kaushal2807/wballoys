@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth, requests, assignments, delivery, dashboard, product_orders, users, assets
@@ -15,13 +16,18 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="WB Alloys Service Management API", version="1.0.0")
 
 # CORS middleware
+allowed_origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+]
+# Add frontend URL from environment if set (e.g. Vercel deployment)
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://your-app.vercel.app",
-    ],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

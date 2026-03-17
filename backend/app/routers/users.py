@@ -37,7 +37,7 @@ def get_users(
 @router.post("/", status_code=201)
 def create_user(
     data: UserCreate,
-    current_user: User = Depends(require_role("admin", "manager")),
+    current_user: User = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
     existing = db.query(User).filter(User.email == data.email).first()
