@@ -155,6 +155,7 @@ export const MOCK_PRODUCT_ORDERS: ProductOrder[] = [
   {
     id: 1, order_number: 'ORD-2024-0001', product_name: 'Industrial Welding Rod', model: 'WB-7018',
     quantity: 500, customer_name: 'Tata Steel Ltd',
+    customer_email: 'orders@tatasteel.com', tracking_password: 'tata@1234',
     delivery_address: 'Plot 42, MIDC Industrial Area, Pune 411026',
     order_date: '2024-03-01', expected_delivery_date: '2024-03-15',
     delivery_status: 'delivered', notes: 'Delivered on time. Customer confirmed receipt.',
@@ -163,6 +164,7 @@ export const MOCK_PRODUCT_ORDERS: ProductOrder[] = [
   {
     id: 2, order_number: 'ORD-2024-0002', product_name: 'Alloy Filler Wire', model: 'WB-ER70S',
     quantity: 200, customer_name: 'Bharat Forge',
+    customer_email: 'procurement@bharatforge.com', tracking_password: 'bharat@1234',
     delivery_address: '18 Mundhwa Road, Pune 411036',
     order_date: '2024-03-05', expected_delivery_date: '2024-03-20',
     delivery_status: 'in_transit', notes: 'Shipped via Bluedart. Tracking: BD12345678',
@@ -171,6 +173,7 @@ export const MOCK_PRODUCT_ORDERS: ProductOrder[] = [
   {
     id: 3, order_number: 'ORD-2024-0003', product_name: 'Flux Cored Wire', model: 'WB-E71T',
     quantity: 100, customer_name: 'Larsen & Toubro',
+    customer_email: 'supply@lnt.com', tracking_password: 'lnt@1234',
     delivery_address: 'L&T Business Park, Powai, Mumbai 400072',
     order_date: '2024-03-10', expected_delivery_date: '2024-03-25',
     delivery_status: 'dispatched',
@@ -179,6 +182,7 @@ export const MOCK_PRODUCT_ORDERS: ProductOrder[] = [
   {
     id: 4, order_number: 'ORD-2024-0004', product_name: 'Submerged Arc Welding Flux', model: 'WB-SAF10',
     quantity: 50, customer_name: 'Godrej & Boyce',
+    customer_email: 'purchase@godrej.com', tracking_password: 'godrej@1234',
     delivery_address: 'Pirojshanagar, Vikhroli East, Mumbai 400079',
     order_date: '2024-03-14', expected_delivery_date: '2024-03-28',
     delivery_status: 'pending',

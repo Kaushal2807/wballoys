@@ -455,6 +455,8 @@ export const requestService = {
       model: data.model,
       quantity: data.quantity,
       customer_name: data.customer_name,
+      customer_email: data.customer_email,
+      tracking_password: data.tracking_password,
       delivery_address: data.delivery_address,
       order_date: data.order_date,
       expected_delivery_date: data.expected_delivery_date,
@@ -466,6 +468,15 @@ export const requestService = {
     };
     MOCK_PRODUCT_ORDERS.unshift(newOrder);
     return { ...newOrder };
+  },
+
+  getProductOrdersByCredentials: async (email: string, password: string): Promise<ProductOrder[]> => {
+    await delay(400);
+    const results = MOCK_PRODUCT_ORDERS.filter(
+      o => o.customer_email.toLowerCase() === email.toLowerCase() && o.tracking_password === password
+    );
+    if (results.length === 0) throw new Error('No orders found. Please check your email and password.');
+    return results.map(o => ({ ...o }));
   },
 
   updateProductDeliveryStatus: async (

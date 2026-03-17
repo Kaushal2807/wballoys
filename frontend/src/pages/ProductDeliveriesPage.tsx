@@ -23,6 +23,8 @@ export const ProductDeliveriesPage: React.FC = () => {
   const [model, setModel] = useState('');
   const [quantity, setQuantity] = useState('');
   const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [trackingPassword, setTrackingPassword] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [orderDate, setOrderDate] = useState('');
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
@@ -58,6 +60,7 @@ export const ProductDeliveriesPage: React.FC = () => {
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productName.trim() || !model.trim() || !quantity || !customerName.trim() ||
+        !customerEmail.trim() || !trackingPassword.trim() ||
         !deliveryAddress.trim() || !orderDate || !expectedDeliveryDate) {
       toast.error('Please fill all required fields');
       return;
@@ -69,6 +72,8 @@ export const ProductDeliveriesPage: React.FC = () => {
         model: model.trim(),
         quantity: parseInt(quantity),
         customer_name: customerName.trim(),
+        customer_email: customerEmail.trim(),
+        tracking_password: trackingPassword.trim(),
         delivery_address: deliveryAddress.trim(),
         order_date: orderDate,
         expected_delivery_date: expectedDeliveryDate,
@@ -76,7 +81,8 @@ export const ProductDeliveriesPage: React.FC = () => {
       }, user!.id);
       toast.success('Product order created successfully!');
       setProductName(''); setModel(''); setQuantity('');
-      setCustomerName(''); setDeliveryAddress('');
+      setCustomerName(''); setCustomerEmail(''); setTrackingPassword('');
+      setDeliveryAddress('');
       setOrderDate(''); setExpectedDeliveryDate(''); setNotes('');
       setShowCreateForm(false);
       loadOrders();
@@ -237,6 +243,32 @@ export const ProductDeliveriesPage: React.FC = () => {
                   onChange={e => setCustomerName(e.target.value)}
                   className="input-field"
                   placeholder="e.g. Tata Steel Ltd"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                  Customer Email *
+                </label>
+                <input
+                  type="email"
+                  value={customerEmail}
+                  onChange={e => setCustomerEmail(e.target.value)}
+                  className="input-field"
+                  placeholder="e.g. orders@company.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
+                  Tracking Password *
+                </label>
+                <input
+                  type="text"
+                  value={trackingPassword}
+                  onChange={e => setTrackingPassword(e.target.value)}
+                  className="input-field"
+                  placeholder="e.g. company@1234"
                   required
                 />
               </div>

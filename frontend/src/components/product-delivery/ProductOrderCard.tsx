@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProductOrder, ProductDeliveryStatus } from '@/types';
 import { getProductDeliveryStatusColor, getProductDeliveryStatusLabel, formatDate } from '@/utils/helpers';
-import { Package, MapPin, Calendar, Eye, EyeOff, Hash, Box, User, FileText, Clock } from 'lucide-react';
+import { Package, MapPin, Calendar, Eye, EyeOff, Hash, Box, User, FileText, Clock, Mail, Lock } from 'lucide-react';
 
 interface ProductOrderCardProps {
   order: ProductOrder;
@@ -10,6 +10,7 @@ interface ProductOrderCardProps {
 
 export const ProductOrderCard: React.FC<ProductOrderCardProps> = ({ order, onUpdateStatus }) => {
   const [showDetails, setShowDetails] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const getNextStatus = (current: ProductDeliveryStatus): ProductDeliveryStatus | null => {
     const pipeline: ProductDeliveryStatus[] = ['pending', 'dispatched', 'in_transit', 'delivered'];
@@ -156,6 +157,30 @@ export const ProductOrderCard: React.FC<ProductOrderCardProps> = ({ order, onUpd
               <div>
                 <p className="text-xs text-gray-500 dark:text-stone-400">Customer</p>
                 <p className="text-sm font-medium text-gray-900 dark:text-dark-text">{order.customer_name}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <Mail className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-stone-400">Customer Email</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-dark-text">{order.customer_email}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 sm:col-span-2">
+              <Lock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 dark:text-stone-400">Tracking Password</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-900 dark:text-dark-text font-mono">
+                    {showPassword ? order.tracking_password : '••••••••'}
+                  </p>
+                  <button
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-stone-300"
+                  >
+                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-2 sm:col-span-2">

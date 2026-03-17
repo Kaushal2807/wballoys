@@ -4,7 +4,7 @@ import { Navbar } from '@/components/common/Navbar';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { UrgencyBadge } from '@/components/common/UrgencyBadge';
-import { Plus, ClipboardList, Package, CheckCircle } from 'lucide-react';
+import { Plus, ClipboardList, Package, CheckCircle, Truck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { requestService } from '@/services/requestService';
 import { ServiceRequest, DashboardStats } from '@/types';
@@ -113,6 +113,30 @@ export const CustomerDashboard: React.FC = () => {
               </span>
             </button>
           </div>
+        </div>
+
+        {/* Track Product Order */}
+        <div className="card p-5 mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+              <Truck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-dark-text">
+                Track Product Order
+              </h3>
+              <p className="text-xs text-gray-600 dark:text-dark-text-secondary">
+                View the delivery status of your product orders using your email and tracking password
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/customer/track-order')}
+            className="btn-primary text-sm whitespace-nowrap flex items-center gap-2"
+          >
+            <Truck className="w-4 h-4" />
+            Track Order
+          </button>
         </div>
 
         {/* Recent Requests */}

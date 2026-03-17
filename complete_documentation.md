@@ -101,6 +101,7 @@ Standard job states:
 - View own jobs/assets/history
 - Upload/view own evidence
 - Sign completion reports
+- Track product order delivery stages using email + tracking password (no login required)
 
 ### 4.2 Engineer
 - View all customer service requests (browse all)
@@ -116,6 +117,7 @@ Standard job states:
 - Approve parts requests
 - Monitor KPI dashboard
 - Review closure quality
+- Create and manage product orders (set customer_email and tracking_password per order)
 
 ### 4.4 Optional Roles
 - Dispatcher: assignment-focused role
@@ -208,6 +210,8 @@ Scheduler -> FastAPI KPI job -> Database KPI tables
 - digital_signatures
 - completion_reports
 - kpi_daily_snapshots
+- product_orders (fields: order_number, product_name, model, quantity, customer_name, **customer_email**, **tracking_password**, delivery_address, order_date, expected_delivery_date, delivery_status, notes, created_by)
+  - `customer_email` + `tracking_password` enable a credential-based public tracking lookup without requiring a user account
 
 ---
 
@@ -228,6 +232,9 @@ Scheduler -> FastAPI KPI job -> Database KPI tables
 - /evidence/commit
 - /reports/completion/{job_id}
 - /dashboard/kpi
+- /product-orders (GET: manager/admin list; POST: manager/admin create — requires customer_email and tracking_password)
+- /product-orders/{id}/status (PATCH: manager/admin advance delivery stage)
+- /product-orders/track (POST: **no auth required** — customer provides email + tracking_password to look up their orders and view delivery stages)
 
 API cross-cutting rules:
 - Idempotency for critical transitions

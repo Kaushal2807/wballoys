@@ -17,6 +17,7 @@ import { AdminDashboard } from '@/pages/AdminDashboard';
 import { CustomerRequestsPage } from '@/pages/customer/CustomerRequestsPage';
 import { CreateRequestPage } from '@/pages/customer/CreateRequestPage';
 import { RequestDetailsPage } from '@/pages/customer/RequestDetailsPage';
+import { ProductTrackingPage } from '@/pages/customer/ProductTrackingPage';
 
 // Engineer Pages
 import { EngineerJobsPage } from '@/pages/engineer/EngineerJobsPage';
@@ -142,6 +143,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <RequestDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/customer/track-order"
+        element={
+          <ProtectedRoute>
+            <ProductTrackingPage />
           </ProtectedRoute>
         }
       />

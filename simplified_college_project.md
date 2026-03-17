@@ -31,12 +31,18 @@ A simplified two-portal service management system for managing equipment service
 - Upload photos (1-3 images max)
 - Mark job as completed
 
-### 5. Delivery Tracking
+### 5. Delivery Tracking (Service Jobs)
 - Separate delivery status tracking per service request
 - 4-step delivery flow: Pending → Dispatched → In Transit → Delivered
 - Engineer and Manager can update delivery status with optional notes
 - Customer can view delivery progress (read-only)
 - Full delivery history with timestamps and user tracking
+
+### 6. Product Order Tracking (Physical Shipments)
+- Admin/Manager creates product orders with a **customer email** and **tracking password**
+- Customer uses email + tracking password (no account needed) to look up their orders
+- Read-only delivery progress bar: Pending → Dispatched → In Transit → Delivered
+- All matching orders for that email/password are returned at once
 
 ### 6. Basic Dashboard
 - Customer: View my requests and status
@@ -87,6 +93,7 @@ New → Assigned → In Progress → Completed → Closed
   │  - Assignments │                   └───────────────────┘
   │  - Updates     │
   │  - Deliveries  │
+  │  - ProductOrders│
   └────────────────┘
 ```
 
@@ -224,28 +231,39 @@ New → Assigned → In Progress → Completed → Closed
 └────┬────┘
      │
      ▼
-┌─────────────────┐
-│   Dashboard     │
-│ • My Requests   │
-│ • Create New    │
-└────┬────────┬───┘
-     │        │
-     │        └──────────┐
-     │                   ▼
-     │            ┌──────────────────┐
-     │            │ Create Request   │
-     │            │ • Select Asset   │
-     │            │ • Description    │
-     │            │ • Urgency        │
-     │            │ • Submit         │
-     │            └────────┬─────────┘
-     │                     │
-     │            ┌────────▼─────────┐
-     │            │ Ticket Generated │
-     │            │ (e.g., REQ-2024) │
-     │            └────────┬─────────┘
-     │                     │
-     ▼                     ▼
+┌──────────────────────┐
+│      Dashboard       │
+│ • My Requests        │
+│ • Create New         │
+│ • Track Product Order│
+└────┬────────┬────────┘
+     │        │              │
+     │        └──────────────┤
+     │                       │
+     │                ┌──────▼────────────────┐
+     │                │  Track Product Order  │
+     │                │ • Enter Email         │
+     │                │ • Enter Password      │
+     │                │ • View delivery stages│
+     │                └───────────────────────┘
+     │
+     ├──── View existing ──▶ Request Details (read-only)
+     │
+     ▼
+┌──────────────────────────────────┐
+│       Create Request              │
+│ • Select Asset                   │
+│ • Description                    │
+│ • Urgency                        │
+│ • Submit                         │
+└────────┬─────────────────────────┘
+         │
+┌────────▼─────────┐
+│ Ticket Generated │
+│ (e.g., REQ-2024) │
+└────────┬─────────┘
+         │
+         ▼
 ┌─────────────────────────────────┐
 │     View Request Details        │
 │ • Status: NEW/ASSIGNED/etc.     │
@@ -811,6 +829,8 @@ DATABASE TABLES AFFECTED:
 - model
 - quantity
 - customer_name
+- customer_email (used as tracking lookup key)
+- tracking_password (plain-text password set by admin/manager, shared with customer)
 - delivery_address
 - order_date
 - expected_delivery_date
@@ -820,6 +840,8 @@ DATABASE TABLES AFFECTED:
 - created_at
 - updated_at
 ```
+
+> `customer_email` + `tracking_password` together authenticate a customer's order tracking lookup. No login/JWT required — customers enter these credentials on the public tracking page to view their order's delivery stages.
 
 ---
 
@@ -860,10 +882,16 @@ DATABASE TABLES AFFECTED:
 - GET `/api/product-orders` (list all product orders)
 - GET `/api/product-orders/{id}` (get single order details)
 - POST `/api/product-orders` (create new product order)
-  - Body: `{ "product_name": "...", "model": "...", "quantity": 100, "customer_name": "...", "delivery_address": "...", "order_date": "2024-03-14", "expected_delivery_date": "2024-03-28", "notes": "optional" }`
+  - Body: `{ "product_name": "...", "model": "...", "quantity": 100, "customer_name": "...", "customer_email": "orders@company.com", "tracking_password": "company@1234", "delivery_address": "...", "order_date": "2024-03-14", "expected_delivery_date": "2024-03-28", "notes": "optional" }`
 - PATCH `/api/product-orders/{id}/status` (update delivery status)
   - Body: `{ "status": "dispatched", "notes": "optional notes" }`
   - Valid transitions: pending → dispatched → in_transit → delivered
+
+### Product Order Tracking (No authentication required)
+- POST `/api/product-orders/track` (customer lookup by email + password)
+  - Body: `{ "email": "orders@company.com", "password": "company@1234" }`
+  - Returns: list of matching `ProductOrder` objects (all orders for that email/password)
+  - Returns 404 if no orders match
 
 ### Dashboard
 - GET `/api/dashboard/stats` (simple counts by role)
@@ -885,6 +913,8 @@ src/
 │   ├── customer/
 │   │   ├── CreateRequest.tsx
 │   │   └── RequestList.tsx
+│   ├── product-delivery/
+│   │   └── ProductOrderCard.tsx   # shows email + masked password (admin/mgr view)
 │   ├── engineer/
 │   │   ├── AssignedJobs.tsx
 │   │   ├── AllRequests.tsx
@@ -895,8 +925,14 @@ src/
 ├── pages/
 │   ├── LoginPage.tsx
 │   ├── DashboardPage.tsx
+│   ├── ProductDeliveriesPage.tsx  # admin + manager: create/manage orders (includes email/password form fields)
 │   ├── RequestsPage.tsx
-│   └── JobDetailsPage.tsx
+│   ├── JobDetailsPage.tsx
+│   └── customer/
+│       ├── CustomerRequestsPage.tsx
+│       ├── CreateRequestPage.tsx
+│       ├── RequestDetailsPage.tsx
+│       └── ProductTrackingPage.tsx  # customer: enter email + password to view order stages
 ├── services/
 │   ├── api.ts
 │   ├── authService.ts
@@ -1135,6 +1171,8 @@ class ProductOrder(Base):
     model = Column(String, nullable=False)
     quantity = Column(Integer, nullable=False)
     customer_name = Column(String, nullable=False)
+    customer_email = Column(String, nullable=False, index=True)   # tracking lookup key
+    tracking_password = Column(String, nullable=False)             # plain-text, for customer lookup
     delivery_address = Column(String, nullable=False)
     order_date = Column(String, nullable=False)
     expected_delivery_date = Column(String, nullable=False)
@@ -1673,6 +1711,8 @@ class ProductOrderCreate(BaseModel):
     model: str
     quantity: int
     customer_name: str
+    customer_email: str          # used as customer tracking lookup key
+    tracking_password: str       # set by manager/admin, shared with customer
     delivery_address: str
     order_date: str
     expected_delivery_date: str
@@ -1681,6 +1721,10 @@ class ProductOrderCreate(BaseModel):
 class ProductOrderStatusUpdate(BaseModel):
     status: str  # pending, dispatched, in_transit, delivered
     notes: Optional[str] = None
+
+class ProductOrderTrackRequest(BaseModel):
+    email: str
+    password: str
 
 # Valid delivery status transitions
 DELIVERY_TRANSITIONS = {
@@ -1739,6 +1783,8 @@ def create_product_order(
         model=data.model,
         quantity=data.quantity,
         customer_name=data.customer_name,
+        customer_email=data.customer_email,
+        tracking_password=data.tracking_password,
         delivery_address=data.delivery_address,
         order_date=data.order_date,
         expected_delivery_date=data.expected_delivery_date,
@@ -1785,6 +1831,27 @@ def update_product_order_status(
     db.commit()
     db.refresh(order)
     return order
+
+# ─── POST /api/product-orders/track (Customer lookup - no auth required) ──
+@router.post("/track")
+def track_product_order(
+    data: ProductOrderTrackRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Public endpoint — no JWT required.
+    Customer provides their email and tracking password to view their orders.
+    Returns all matching orders for that email/password combination.
+    """
+    orders = db.query(ProductOrder).filter(
+        ProductOrder.customer_email == data.email.lower(),
+        ProductOrder.tracking_password == data.password,
+    ).order_by(ProductOrder.created_at.desc()).all()
+
+    if not orders:
+        raise HTTPException(status_code=404, detail="No orders found. Please check your email and password.")
+
+    return orders
 ```
 
 ### routers/assignments.py

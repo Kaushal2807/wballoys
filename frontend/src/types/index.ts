@@ -150,6 +150,8 @@ export interface ProductOrder {
   model: string;
   quantity: number;
   customer_name: string;
+  customer_email: string;
+  tracking_password: string;
   delivery_address: string;
   order_date: string;
   expected_delivery_date: string;
@@ -165,6 +167,8 @@ export interface CreateProductOrderPayload {
   model: string;
   quantity: number;
   customer_name: string;
+  customer_email: string;
+  tracking_password: string;
   delivery_address: string;
   order_date: string;
   expected_delivery_date: string;
