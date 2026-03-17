@@ -1,495 +1,232 @@
 import {
   ServiceRequest, JobAssignment, JobUpdate, JobPhoto, DeliveryUpdate, DeliveryStatus,
   Asset, User, DashboardStats, CreateRequestPayload,
-  RequestFilters, UrgencyLevel, RequestStatus,
+  RequestFilters,
   ProductOrder, ProductDeliveryStatus, CreateProductOrderPayload,
 } from '../types';
-import {
-  MOCK_USERS, MOCK_ASSETS, MOCK_REQUESTS, MOCK_ASSIGNMENTS,
-  MOCK_UPDATES, MOCK_PHOTOS, MOCK_DELIVERIES,
-  MOCK_PRODUCT_ORDERS,
-  getNextRequestId, getNextAssignmentId, getNextUpdateId, getNextPhotoId,
-  getNextUserId, getNextAssetId, getNextDeliveryId,
-  getNextProductOrderId, generateOrderNumber,
-  generateTicketNumber,
-} from './mockData';
-
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Helper to populate a request with related data
-const populateRequest = (req: ServiceRequest): ServiceRequest => {
-  const customer = MOCK_USERS.find(u => u.id === req.customer_id);
-  const asset = MOCK_ASSETS.find(a => a.id === req.asset_id);
-  const assignment = MOCK_ASSIGNMENTS.find(a => a.request_id === req.id);
-  const populatedAssignment = assignment ? {
-    ...assignment,
-    engineer: MOCK_USERS.find(u => u.id === assignment.engineer_id),
-    assigner: MOCK_USERS.find(u => u.id === assignment.assigned_by),
-  } : undefined;
-
-  return { ...req, customer, asset, assignment: populatedAssignment };
-};
+import apiClient from './api';
 
 export const requestService = {
   // ─── Customer Operations ─────────────────────────────
 
-  getMyRequests: async (customerId: number): Promise<ServiceRequest[]> => {
-    await delay(300);
-    return MOCK_REQUESTS
-      .filter(r => r.customer_id === customerId)
-      .map(populateRequest)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  getMyRequests: async (_customerId: number): Promise<ServiceRequest[]> => {
+    const response = await apiClient.get('/requests/');
+    return response.data;
   },
 
   getRequestById: async (requestId: number): Promise<ServiceRequest> => {
-    await delay(300);
-    const request = MOCK_REQUESTS.find(r => r.id === requestId);
-    if (!request) throw new Error('Request not found');
-    return populateRequest(request);
+    const response = await apiClient.get(`/requests/${requestId}`);
+    return response.data;
   },
 
   createRequest: async (data: CreateRequestPayload): Promise<ServiceRequest> => {
-    await delay(400);
-    const newRequest: ServiceRequest = {
-      id: getNextRequestId(),
-      ticket_number: generateTicketNumber(),
-      customer_id: data.customer_id,
+    const response = await apiClient.post('/requests/', {
       asset_id: data.asset_id,
       description: data.description,
-      urgency: data.urgency as UrgencyLevel,
+      urgency: data.urgency,
       preferred_date: data.preferred_date,
       preferred_time: data.preferred_time,
-      status: 'new',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    MOCK_REQUESTS.unshift(newRequest);
-    return populateRequest(newRequest);
+    });
+    return response.data;
   },
 
   closeRequest: async (requestId: number): Promise<ServiceRequest> => {
-    await delay(300);
-    const request = MOCK_REQUESTS.find(r => r.id === requestId);
-    if (!request) throw new Error('Request not found');
-    request.status = 'closed';
-    request.updated_at = new Date().toISOString();
-    return populateRequest(request);
+    const response = await apiClient.patch(`/requests/${requestId}/close`);
+    return response.data;
   },
 
   getAssetsByCustomer: async (_customerId: number): Promise<Asset[]> => {
-    await delay(200);
-    return [...MOCK_ASSETS];
+    const response = await apiClient.get('/assets/');
+    return response.data;
   },
 
   // ─── Engineer Operations ─────────────────────────────
 
-  // Get ALL customer requests (visible to all engineers)
   getAllRequestsForEngineer: async (_engineerId: number): Promise<ServiceRequest[]> => {
-    await delay(300);
-    return MOCK_REQUESTS
-      .map(populateRequest)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const response = await apiClient.get('/requests/all');
+    return response.data;
   },
 
-  getMyJobs: async (engineerId: number): Promise<ServiceRequest[]> => {
-    await delay(300);
-    const myAssignments = MOCK_ASSIGNMENTS.filter(a => a.engineer_id === engineerId);
-    const requestIds = myAssignments.map(a => a.request_id);
-    return MOCK_REQUESTS
-      .filter(r => requestIds.includes(r.id))
-      .map(populateRequest)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  getMyJobs: async (_engineerId: number): Promise<ServiceRequest[]> => {
+    const response = await apiClient.get('/requests/');
+    return response.data;
   },
 
   acceptJob: async (assignmentId: number): Promise<JobAssignment> => {
-    await delay(300);
-    const assignment = MOCK_ASSIGNMENTS.find(a => a.id === assignmentId);
-    if (!assignment) throw new Error('Assignment not found');
-    assignment.status = 'accepted';
-    assignment.accepted_at = new Date().toISOString();
-    const request = MOCK_REQUESTS.find(r => r.id === assignment.request_id);
-    if (request) {
-      request.status = 'in_progress';
-      request.updated_at = new Date().toISOString();
-    }
-    return { ...assignment, engineer: MOCK_USERS.find(u => u.id === assignment.engineer_id) };
+    const response = await apiClient.patch(`/assignments/${assignmentId}/accept`);
+    return response.data;
   },
 
   rejectJob: async (assignmentId: number): Promise<JobAssignment> => {
-    await delay(300);
-    const assignment = MOCK_ASSIGNMENTS.find(a => a.id === assignmentId);
-    if (!assignment) throw new Error('Assignment not found');
-    assignment.status = 'rejected';
-    const request = MOCK_REQUESTS.find(r => r.id === assignment.request_id);
-    if (request) {
-      request.status = 'new';
-      request.updated_at = new Date().toISOString();
-    }
-    return { ...assignment };
+    const response = await apiClient.patch(`/assignments/${assignmentId}/reject`);
+    return response.data;
   },
 
-  // Engineer self-claims a new unassigned request (no manager assignment needed)
-  engineerSelfAccept: async (requestId: number, engineerId: number): Promise<ServiceRequest> => {
-    await delay(300);
-    const request = MOCK_REQUESTS.find(r => r.id === requestId);
-    if (!request) throw new Error('Request not found');
-    if (request.status !== 'new') throw new Error('This request is no longer available');
-    const existing = MOCK_ASSIGNMENTS.find(
-      a => a.request_id === requestId && (a.status === 'pending' || a.status === 'accepted')
-    );
-    if (existing) throw new Error('Another engineer has already claimed this request');
-
-    const assignment: JobAssignment = {
-      id: getNextAssignmentId(),
-      request_id: requestId,
-      engineer_id: engineerId,
-      assigned_by: engineerId,
-      assigned_at: new Date().toISOString(),
-      accepted_at: new Date().toISOString(),
-      status: 'accepted',
-    };
-    MOCK_ASSIGNMENTS.push(assignment);
-
-    request.status = 'in_progress';
-    request.updated_at = new Date().toISOString();
-
-    const engineer = MOCK_USERS.find(u => u.id === engineerId);
-    MOCK_UPDATES.push({
-      id: getNextUpdateId(),
-      request_id: requestId,
-      user_id: engineerId,
-      notes: `${engineer?.name || 'Engineer'} accepted and self-assigned this job.`,
-      created_at: new Date().toISOString(),
-    });
-
-    return populateRequest(request);
+  engineerSelfAccept: async (requestId: number, _engineerId: number): Promise<ServiceRequest> => {
+    const response = await apiClient.post(`/requests/${requestId}/self-accept`);
+    return response.data;
   },
 
-  // Engineer rejects a new unassigned request (stays visible but greyed-out for them)
-  engineerRejectNew: async (requestId: number, engineerId: number): Promise<ServiceRequest> => {
-    await delay(200);
-    const request = MOCK_REQUESTS.find(r => r.id === requestId);
-    if (!request) throw new Error('Request not found');
-    if (!request.rejected_by_engineers) {
-      request.rejected_by_engineers = [];
-    }
-    if (!request.rejected_by_engineers.includes(engineerId)) {
-      request.rejected_by_engineers.push(engineerId);
-    }
-    return populateRequest(request);
+  engineerRejectNew: async (requestId: number, _engineerId: number): Promise<ServiceRequest> => {
+    const response = await apiClient.post(`/requests/${requestId}/reject-new`);
+    return response.data;
   },
 
   startWork: async (requestId: number): Promise<ServiceRequest> => {
-    await delay(300);
-    const request = MOCK_REQUESTS.find(r => r.id === requestId);
-    if (!request) throw new Error('Request not found');
-    request.status = 'in_progress';
-    request.updated_at = new Date().toISOString();
-    return populateRequest(request);
+    const response = await apiClient.patch(`/requests/${requestId}/start`);
+    return response.data;
   },
 
   markComplete: async (requestId: number): Promise<ServiceRequest> => {
-    await delay(300);
-    const request = MOCK_REQUESTS.find(r => r.id === requestId);
-    if (!request) throw new Error('Request not found');
-    request.status = 'completed';
-    request.updated_at = new Date().toISOString();
-    return populateRequest(request);
+    const response = await apiClient.patch(`/requests/${requestId}/complete`);
+    return response.data;
   },
 
-  addJobUpdate: async (requestId: number, notes: string, userId: number): Promise<JobUpdate> => {
-    await delay(300);
-    const update: JobUpdate = {
-      id: getNextUpdateId(),
-      request_id: requestId,
-      user_id: userId,
-      notes,
-      created_at: new Date().toISOString(),
-      user: MOCK_USERS.find(u => u.id === userId),
-    };
-    MOCK_UPDATES.push(update);
-    return update;
+  addJobUpdate: async (requestId: number, notes: string, _userId: number): Promise<JobUpdate> => {
+    const response = await apiClient.post(`/requests/${requestId}/updates`, { notes });
+    return response.data;
   },
 
-  uploadPhoto: async (requestId: number, file: File, userId: number): Promise<JobPhoto> => {
-    await delay(500);
-    const photoUrl = URL.createObjectURL(file);
-    const photo: JobPhoto = {
-      id: getNextPhotoId(),
-      request_id: requestId,
-      uploaded_by: userId,
+  uploadPhoto: async (requestId: number, file: File, _userId: number): Promise<JobPhoto> => {
+    // For now, use a data URL approach since we don't have Cloudinary set up
+    // Convert file to base64 data URL for storage
+    const toBase64 = (f: File): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(f);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+      });
+
+    const photoUrl = await toBase64(file);
+    const response = await apiClient.post(`/requests/${requestId}/photos`, {
       photo_url: photoUrl,
-      uploaded_at: new Date().toISOString(),
-      uploader: MOCK_USERS.find(u => u.id === userId),
-    };
-    MOCK_PHOTOS.push(photo);
-    return photo;
+    });
+    return response.data;
   },
 
   // ─── Manager Operations ──────────────────────────────
 
   getAllRequests: async (filters?: RequestFilters): Promise<ServiceRequest[]> => {
-    await delay(300);
-    let requests = MOCK_REQUESTS.map(populateRequest);
-
-    if (filters) {
-      if (filters.status && filters.status !== 'all') {
-        requests = requests.filter(r => r.status === (filters.status as RequestStatus));
-      }
-      if (filters.urgency && filters.urgency !== 'all') {
-        requests = requests.filter(r => r.urgency === (filters.urgency as UrgencyLevel));
-      }
-      if (filters.search) {
-        const search = filters.search.toLowerCase();
-        requests = requests.filter(r =>
-          r.ticket_number.toLowerCase().includes(search) ||
-          r.description.toLowerCase().includes(search)
-        );
-      }
-    }
-
-    return requests.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const params: Record<string, string> = {};
+    if (filters?.status && filters.status !== 'all') params.status = filters.status;
+    if (filters?.urgency && filters.urgency !== 'all') params.urgency = filters.urgency;
+    if (filters?.search) params.search = filters.search;
+    const response = await apiClient.get('/requests/', { params });
+    return response.data;
   },
 
   assignEngineer: async (
-    requestId: number, engineerId: number, note: string, assignedBy: number
+    requestId: number, engineerId: number, note: string, _assignedBy: number
   ): Promise<JobAssignment> => {
-    await delay(400);
-    const request = MOCK_REQUESTS.find(r => r.id === requestId);
-    if (!request) throw new Error('Request not found');
-
-    const assignment: JobAssignment = {
-      id: getNextAssignmentId(),
+    const response = await apiClient.post('/assignments/', {
       request_id: requestId,
       engineer_id: engineerId,
-      assigned_by: assignedBy,
-      assigned_at: new Date().toISOString(),
-      status: 'pending',
-    };
-    MOCK_ASSIGNMENTS.push(assignment);
-
-    request.status = 'assigned';
-    request.updated_at = new Date().toISOString();
-
-    // Add update note
-    if (note) {
-      const engineer = MOCK_USERS.find(u => u.id === engineerId);
-      MOCK_UPDATES.push({
-        id: getNextUpdateId(),
-        request_id: requestId,
-        user_id: assignedBy,
-        notes: `Assigned to ${engineer?.name || 'engineer'}. Note: ${note}`,
-        created_at: new Date().toISOString(),
-      });
-    }
-
-    return { ...assignment, engineer: MOCK_USERS.find(u => u.id === engineerId) };
+      note,
+    });
+    return response.data;
   },
 
   getEngineers: async (): Promise<User[]> => {
-    await delay(200);
-    return MOCK_USERS.filter(u => u.role === 'engineer');
+    const response = await apiClient.get('/assignments/engineers');
+    return response.data;
   },
 
   // ─── Delivery Operations ────────────────────────────────
 
   getDeliveryUpdates: async (requestId: number): Promise<DeliveryUpdate[]> => {
-    await delay(200);
-    return MOCK_DELIVERIES
-      .filter(d => d.request_id === requestId)
-      .map(d => ({ ...d, user: MOCK_USERS.find(u => u.id === d.updated_by) }))
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+    const response = await apiClient.get(`/requests/${requestId}/delivery`);
+    return response.data;
   },
 
   updateDeliveryStatus: async (
-    requestId: number, status: DeliveryStatus, userId: number, notes?: string
+    requestId: number, status: DeliveryStatus, _userId: number, notes?: string
   ): Promise<DeliveryUpdate> => {
-    await delay(300);
-    const request = MOCK_REQUESTS.find(r => r.id === requestId);
-    if (!request) throw new Error('Request not found');
-
-    request.delivery_status = status;
-    request.updated_at = new Date().toISOString();
-
-    const deliveryUpdate: DeliveryUpdate = {
-      id: getNextDeliveryId(),
-      request_id: requestId,
+    const response = await apiClient.patch(`/requests/${requestId}/delivery`, {
       status,
-      updated_by: userId,
-      notes: notes || undefined,
-      updated_at: new Date().toISOString(),
-      user: MOCK_USERS.find(u => u.id === userId),
-    };
-    MOCK_DELIVERIES.push(deliveryUpdate);
-
-    // Also add a job update note for the timeline
-    const statusLabels: Record<DeliveryStatus, string> = {
-      site_visited: 'Site Visited',
-      photos_taken: 'Photos Taken',
-      next_date_given: 'Next Date Given',
-      service_solved: 'Service Solved',
-    };
-    const user = MOCK_USERS.find(u => u.id === userId);
-    MOCK_UPDATES.push({
-      id: getNextUpdateId(),
-      request_id: requestId,
-      user_id: userId,
-      notes: `Status updated to "${statusLabels[status]}" by ${user?.name || 'Unknown'}.${notes ? ` Notes: ${notes}` : ''}`,
-      created_at: new Date().toISOString(),
+      notes: notes || null,
     });
-
-    return deliveryUpdate;
+    return response.data;
   },
 
   // ─── Shared Operations ───────────────────────────────
 
   getRequestUpdates: async (requestId: number): Promise<JobUpdate[]> => {
-    await delay(200);
-    return MOCK_UPDATES
-      .filter(u => u.request_id === requestId)
-      .map(u => ({ ...u, user: MOCK_USERS.find(usr => usr.id === u.user_id) }))
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const response = await apiClient.get(`/requests/${requestId}/updates`);
+    return response.data;
   },
 
   getRequestPhotos: async (requestId: number): Promise<JobPhoto[]> => {
-    await delay(200);
-    return MOCK_PHOTOS
-      .filter(p => p.request_id === requestId)
-      .map(p => ({ ...p, uploader: MOCK_USERS.find(u => u.id === p.uploaded_by) }));
+    const response = await apiClient.get(`/requests/${requestId}/photos`);
+    return response.data;
   },
 
-  getDashboardStats: async (userId: number, role: string): Promise<DashboardStats> => {
-    await delay(200);
-    let requests: ServiceRequest[];
-
-    if (role === 'customer') {
-      requests = MOCK_REQUESTS.filter(r => r.customer_id === userId);
-    } else if (role === 'engineer') {
-      // Engineer sees stats for all requests (since all are visible now)
-      requests = [...MOCK_REQUESTS];
-    } else {
-      requests = [...MOCK_REQUESTS];
-    }
-
-    return {
-      total_requests: requests.length,
-      new_requests: requests.filter(r => r.status === 'new').length,
-      assigned_requests: requests.filter(r => r.status === 'assigned').length,
-      in_progress_requests: requests.filter(r => r.status === 'in_progress').length,
-      completed_requests: requests.filter(r => r.status === 'completed').length,
-      closed_requests: requests.filter(r => r.status === 'closed').length,
-      urgent_requests: requests.filter(r => r.urgency === 'high').length,
-    };
+  getDashboardStats: async (_userId: number, _role: string): Promise<DashboardStats> => {
+    const response = await apiClient.get('/dashboard/stats');
+    return response.data;
   },
 
   // ─── Admin Operations ─────────────────────────────────
 
   getAllUsers: async (): Promise<User[]> => {
-    await delay(200);
-    return MOCK_USERS.filter(u => u.role !== 'admin');
+    const response = await apiClient.get('/users/');
+    return response.data;
   },
 
-  createUser: async (name: string, email: string, _password: string, role: string): Promise<User> => {
-    await delay(400);
-    const existing = MOCK_USERS.find(u => u.email === email);
-    if (existing) throw new Error('A user with this email already exists');
-    const newUser: User = {
-      id: getNextUserId(),
-      name,
-      email,
-      role: role as User['role'],
-      created_at: new Date().toISOString(),
-    };
-    MOCK_USERS.push(newUser);
-    return newUser;
+  createUser: async (name: string, email: string, password: string, role: string): Promise<User> => {
+    const response = await apiClient.post('/users/', { name, email, password, role });
+    return response.data;
   },
 
   getAllAssets: async (): Promise<Asset[]> => {
-    await delay(200);
-    return [...MOCK_ASSETS];
+    const response = await apiClient.get('/assets/');
+    return response.data;
   },
 
   createAsset: async (
     asset_name: string, model: string,
     serial_number: string, location: string
   ): Promise<Asset> => {
-    await delay(400);
-    const newAsset: Asset = {
-      id: getNextAssetId(),
-      customer_id: 0,
-      asset_name,
-      model,
-      serial_number,
-      location,
-    };
-    MOCK_ASSETS.push(newAsset);
-    return newAsset;
+    const response = await apiClient.post('/assets/', {
+      asset_name, model, serial_number, location,
+    });
+    return response.data;
   },
 
   getCustomers: async (): Promise<User[]> => {
-    await delay(200);
-    return MOCK_USERS.filter(u => u.role === 'customer');
+    const response = await apiClient.get('/users/', { params: { role: 'customer' } });
+    return response.data;
   },
 
   // ─── Product Delivery Operations ───────────────────────
 
   getAllProductOrders: async (): Promise<ProductOrder[]> => {
-    await delay(300);
-    return [...MOCK_PRODUCT_ORDERS]
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const response = await apiClient.get('/product-orders/');
+    return response.data;
   },
 
   getProductOrderById: async (orderId: number): Promise<ProductOrder> => {
-    await delay(300);
-    const order = MOCK_PRODUCT_ORDERS.find(o => o.id === orderId);
-    if (!order) throw new Error('Product order not found');
-    return { ...order };
+    const response = await apiClient.get(`/product-orders/${orderId}`);
+    return response.data;
   },
 
-  createProductOrder: async (data: CreateProductOrderPayload, createdBy: number): Promise<ProductOrder> => {
-    await delay(400);
-    const newOrder: ProductOrder = {
-      id: getNextProductOrderId(),
-      order_number: generateOrderNumber(),
-      product_name: data.product_name,
-      model: data.model,
-      quantity: data.quantity,
-      customer_name: data.customer_name,
-      customer_email: data.customer_email,
-      tracking_password: data.tracking_password,
-      delivery_address: data.delivery_address,
-      order_date: data.order_date,
-      expected_delivery_date: data.expected_delivery_date,
-      delivery_status: 'pending',
-      notes: data.notes || undefined,
-      created_by: createdBy,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    MOCK_PRODUCT_ORDERS.unshift(newOrder);
-    return { ...newOrder };
+  createProductOrder: async (data: CreateProductOrderPayload, _createdBy: number): Promise<ProductOrder> => {
+    const response = await apiClient.post('/product-orders/', data);
+    return response.data;
   },
 
   getProductOrdersByCredentials: async (email: string, password: string): Promise<ProductOrder[]> => {
-    await delay(400);
-    const results = MOCK_PRODUCT_ORDERS.filter(
-      o => o.customer_email.toLowerCase() === email.toLowerCase() && o.tracking_password === password
-    );
-    if (results.length === 0) throw new Error('No orders found. Please check your email and password.');
-    return results.map(o => ({ ...o }));
+    const response = await apiClient.post('/product-orders/track', { email, password });
+    return response.data;
   },
 
   updateProductDeliveryStatus: async (
     orderId: number, status: ProductDeliveryStatus, notes?: string
   ): Promise<ProductOrder> => {
-    await delay(300);
-    const order = MOCK_PRODUCT_ORDERS.find(o => o.id === orderId);
-    if (!order) throw new Error('Product order not found');
-    order.delivery_status = status;
-    order.updated_at = new Date().toISOString();
-    if (notes !== undefined) {
-      order.notes = notes;
-    }
-    return { ...order };
+    const response = await apiClient.patch(`/product-orders/${orderId}/status`, {
+      status,
+      notes: notes || null,
+    });
+    return response.data;
   },
 };
