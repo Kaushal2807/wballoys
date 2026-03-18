@@ -31,3 +31,11 @@ class UserCreate(BaseModel):
     email: str
     password: str
     role: str
+
+
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+
+class UserRoleUpdate(BaseModel):
+    role: str  # customer, engineer, manager, admin

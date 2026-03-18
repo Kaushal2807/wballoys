@@ -8,7 +8,8 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    password_hash = Column(String, nullable=False)
+    password_hash = Column(String, nullable=True)
     name = Column(String, nullable=False)
     role = Column(String, nullable=False)  # customer, engineer, manager, admin
+    auth_provider = Column(String, nullable=False, server_default="local")  # local, google
     created_at = Column(DateTime(timezone=True), server_default=func.now())

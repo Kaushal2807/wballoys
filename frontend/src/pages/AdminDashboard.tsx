@@ -3,15 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Navbar } from '@/components/common/Navbar';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { Users, Package, Plus, Truck } from 'lucide-react';
+import { EditUserRoleModal } from '@/components/admin/EditUserRoleModal';
+import { Users, Package, Plus, Truck, Edit } from 'lucide-react';
 import { requestService } from '@/services/requestService';
 import { User, Asset } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Edit user role modal state
+  const [showEditRoleModal, setShowEditRoleModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // User form state
   const [userName, setUserName] = useState('');
@@ -93,6 +100,27 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleEditRole = (user: User) => {
+    setSelectedUser(user);
+    setShowEditRoleModal(true);
+  };
+
+  const handleRoleUpdate = async (userId: number, newRole: string) => {
+    try {
+      await requestService.updateUserRole(userId, newRole);
+      toast.success('User role updated successfully!');
+      loadData(); // Reload users to show updated role
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update user role');
+      throw err; // Re-throw to let modal handle loading state
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditRoleModal(false);
+    setSelectedUser(null);
+  };
+
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'customer':
@@ -101,6 +129,8 @@ export const AdminDashboard: React.FC = () => {
         return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
       case 'manager':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300';
+      case 'admin':
+        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-stone-800/30 dark:text-stone-300';
     }
@@ -207,6 +237,7 @@ export const AdminDashboard: React.FC = () => {
                 <option value="customer">Customer</option>
                 <option value="engineer">Engineer</option>
                 <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
               </select>
               <button
                 type="submit"
@@ -224,15 +255,24 @@ export const AdminDashboard: React.FC = () => {
                   key={u.id}
                   className="border border-gray-200 dark:border-dark-border rounded-lg p-3 flex items-center justify-between"
                 >
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium text-gray-900 dark:text-dark-text text-sm">{u.name}</p>
                     <p className="text-xs text-gray-500 dark:text-stone-400">{u.email}</p>
                   </div>
-                  <span
-                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRoleBadgeColor(u.role)}`}
-                  >
-                    {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRoleBadgeColor(u.role)}`}
+                    >
+                      {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                    </span>
+                    <button
+                      onClick={() => handleEditRole(u)}
+                      className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-border rounded-md transition-colors"
+                      title={currentUser?.id === u.id ? "Cannot edit your own role" : "Edit role"}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -309,6 +349,15 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Edit User Role Modal */}
+      <EditUserRoleModal
+        isOpen={showEditRoleModal}
+        onClose={handleCloseEditModal}
+        user={selectedUser}
+        onUpdate={handleRoleUpdate}
+        currentUserId={currentUser?.id}
+      />
     </div>
   );
 };

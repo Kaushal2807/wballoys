@@ -1,8 +1,10 @@
 import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import auth, requests, assignments, delivery, dashboard, product_orders, users, assets
-from app.database import engine, Base
+from app.database import init_db
 
 # Import all models so they are registered with Base.metadata
 from app.models import (  # noqa: F401
@@ -10,10 +12,14 @@ from app.models import (  # noqa: F401
     JobUpdate, JobPhoto, DeliveryUpdate, ProductOrder,
 )
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="WB Alloys Service Management API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="WB Alloys Service Management API", version="1.0.0", lifespan=lifespan)
 
 # CORS middleware
 allowed_origins = [

@@ -4,7 +4,7 @@ from app.database import get_db
 from app.models.user import User
 from app.utils.security import hash_password
 from app.dependencies.auth import get_current_user, require_role
-from app.schemas.user import UserCreate
+from app.schemas.user import UserCreate, UserRoleUpdate
 
 router = APIRouter()
 
@@ -54,3 +54,38 @@ def create_user(
     db.commit()
     db.refresh(user)
     return serialize_user(user)
+
+
+# ─── PATCH /api/users/{user_id}/role (Update user role - admin) ──
+@router.patch("/{user_id}/role", status_code=200)
+def update_user_role(
+    user_id: int,
+    data: UserRoleUpdate,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    # Validate role value
+    valid_roles = ["customer", "engineer", "manager", "admin"]
+    if data.role not in valid_roles:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid role. Must be one of: {', '.join(valid_roles)}"
+        )
+
+    # Find the target user
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Prevent admin from changing their own role
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot modify your own role"
+        )
+
+    # Update the user's role
+    target_user.role = data.role
+    db.commit()
+    db.refresh(target_user)
+    return serialize_user(target_user)

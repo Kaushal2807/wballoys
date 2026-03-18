@@ -178,6 +178,11 @@ export const requestService = {
     return response.data;
   },
 
+  updateUserRole: async (userId: number, role: string): Promise<User> => {
+    const response = await apiClient.patch(`/users/${userId}/role`, { role });
+    return response.data;
+  },
+
   getAllAssets: async (): Promise<Asset[]> => {
     const response = await apiClient.get('/assets/');
     return response.data;

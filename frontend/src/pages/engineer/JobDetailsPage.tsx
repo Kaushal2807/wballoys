@@ -25,7 +25,6 @@ export const JobDetailsPage: React.FC = () => {
   const [noteText, setNoteText] = useState('');
   const [addingNote, setAddingNote] = useState(false);
   const [deliveryUpdates, setDeliveryUpdates] = useState<DeliveryUpdate[]>([]);
-  const [deliveryNotes, setDeliveryNotes] = useState('');
   const [updatingDelivery, setUpdatingDelivery] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -158,9 +157,8 @@ export const JobDetailsPage: React.FC = () => {
     if (!nextStatus) return;
     setUpdatingDelivery(true);
     try {
-      await requestService.updateDeliveryStatus(request.id, nextStatus, user!.id, deliveryNotes.trim() || undefined);
+      await requestService.updateDeliveryStatus(request.id, nextStatus, user!.id);
       toast.success(`Status updated to "${DELIVERY_STEPS.find(s => s.status === nextStatus)?.label}"`);
-      setDeliveryNotes('');
       loadData();
     } catch { toast.error('Failed to update status'); }
     finally { setUpdatingDelivery(false); }
@@ -364,13 +362,6 @@ export const JobDetailsPage: React.FC = () => {
             {/* Update Delivery Action */}
             {getNextDeliveryStatus() && (
               <div className="border-t border-gray-100 dark:border-dark-border pt-4">
-                <textarea
-                  value={deliveryNotes}
-                  onChange={(e) => setDeliveryNotes(e.target.value)}
-                  placeholder="Add delivery notes (optional)..."
-                  rows={2}
-                  className="input-field mb-3"
-                />
                 <button
                   onClick={handleUpdateDelivery}
                   disabled={updatingDelivery}
