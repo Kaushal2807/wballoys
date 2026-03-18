@@ -6,7 +6,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { UrgencyBadge } from '@/components/common/UrgencyBadge';
 import { AssignEngineerModal } from '@/components/manager/AssignEngineerModal';
-import { Users, AlertTriangle, TrendingUp, CheckCircle2, Truck } from 'lucide-react';
+import { Users, AlertTriangle, TrendingUp, CheckCircle2, Truck, FolderOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { requestService } from '@/services/requestService';
 import { ServiceRequest, DashboardStats, User } from '@/types';
@@ -90,13 +90,22 @@ export const ManagerDashboard: React.FC = () => {
           <p className="text-gray-600 dark:text-dark-text-secondary">
             Overview of all service requests and team performance
           </p>
-          <button
-            onClick={() => navigate('/manager/product-deliveries')}
-            className="btn-primary text-sm flex items-center gap-2 mt-4"
-          >
-            <Truck className="w-4 h-4" />
-            Product Deliveries
-          </button>
+          <div className="flex flex-wrap gap-3 mt-4">
+            <button
+              onClick={() => navigate('/manager/product-deliveries')}
+              className="btn-primary text-sm flex items-center gap-2"
+            >
+              <Truck className="w-4 h-4" />
+              Product Deliveries
+            </button>
+            <button
+              onClick={() => navigate('/files')}
+              className="btn-secondary text-sm flex items-center gap-2"
+            >
+              <FolderOpen className="w-4 h-4" />
+              File Manager
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}

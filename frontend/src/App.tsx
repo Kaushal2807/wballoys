@@ -12,6 +12,7 @@ import { CustomerDashboard } from '@/pages/CustomerDashboard';
 import { EngineerDashboard } from '@/pages/EngineerDashboard';
 import { ManagerDashboard } from '@/pages/ManagerDashboard';
 import { AdminDashboard } from '@/pages/AdminDashboard';
+import { FileManagerPage } from '@/pages/FileManagerPage';
 
 // Customer Pages
 import { CustomerRequestsPage } from '@/pages/customer/CustomerRequestsPage';
@@ -205,6 +206,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ProductDeliveriesPage />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* File Manager Route */}
+      <Route
+        path="/files"
+        element={
+          <ProtectedRoute>
+            <FileManagerPage />
           </ProtectedRoute>
         }
       />
