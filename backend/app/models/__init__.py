@@ -8,6 +8,7 @@ from app.models.service_request import (
     DeliveryUpdate,
     ProductOrder,
 )
+from app.models.file import File
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "JobPhoto",
     "DeliveryUpdate",
     "ProductOrder",
+    "File",
 ]

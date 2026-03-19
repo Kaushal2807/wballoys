@@ -42,3 +42,4 @@ backend/.env
 
 # Uploads
 backend/uploads/
+backend/firebase-service-account.json

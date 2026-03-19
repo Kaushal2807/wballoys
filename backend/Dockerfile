@@ -9,6 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Copy Firebase service account and .env
+COPY firebase-service-account.json* ./
+COPY .env* ./
+
 # Expose port
 EXPOSE 8000
 
