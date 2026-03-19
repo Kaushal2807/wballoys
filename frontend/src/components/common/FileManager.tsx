@@ -181,34 +181,69 @@ export const FileManager: React.FC = () => {
     }
   };
 
-  const handleDownload = (file: FileItem) => {
-    // Modify the Cloudinary URL to force download using fl_attachment
-    let downloadUrl = file.cloudinary_url;
+  const handleDownload = async (file: FileItem) => {
+    try {
+      // Modify the Cloudinary URL to force download using fl_attachment
+      let downloadUrl = file.cloudinary_url;
 
-    // Check if it's a Cloudinary URL and add fl_attachment parameter
-    if (downloadUrl.includes('cloudinary.com')) {
-      // For raw files (non-image), use fl_attachment
-      if (downloadUrl.includes('/raw/upload/')) {
-        downloadUrl = downloadUrl.replace('/raw/upload/', '/raw/upload/fl_attachment/');
+      // Check if it's a Cloudinary URL and add fl_attachment parameter
+      if (downloadUrl.includes('cloudinary.com')) {
+        // For raw files (non-image), use fl_attachment
+        if (downloadUrl.includes('/raw/upload/')) {
+          downloadUrl = downloadUrl.replace('/raw/upload/', '/raw/upload/fl_attachment/');
+        }
+        // For images, use fl_attachment as well
+        else if (downloadUrl.includes('/image/upload/')) {
+          downloadUrl = downloadUrl.replace('/image/upload/', '/image/upload/fl_attachment/');
+        }
+        // For videos
+        else if (downloadUrl.includes('/video/upload/')) {
+          downloadUrl = downloadUrl.replace('/video/upload/', '/video/upload/fl_attachment/');
+        }
       }
-      // For images, use fl_attachment as well
-      else if (downloadUrl.includes('/image/upload/')) {
-        downloadUrl = downloadUrl.replace('/image/upload/', '/image/upload/fl_attachment/');
-      }
-      // For videos
-      else if (downloadUrl.includes('/video/upload/')) {
-        downloadUrl = downloadUrl.replace('/video/upload/', '/video/upload/fl_attachment/');
-      }
+
+      // Fetch the file as a blob
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+
+      // Create a temporary download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = file.original_filename; // Use the original filename
+      link.style.display = 'none';
+
+      // Append to body, click, and cleanup
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Release the blob URL
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download file');
     }
-
-    // Open the modified URL which will trigger download
-    window.open(downloadUrl, '_blank');
   };
 
   const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) return <ImageIcon className="w-6 h-6" />;
-    if (fileType.includes('pdf')) return <FileText className="w-6 h-6" />;
-    return <FileIcon className="w-6 h-6" />;
+    if (fileType.startsWith('image/')) return <ImageIcon className="w-6 h-6 text-blue-500" />;
+    if (fileType.includes('pdf')) return <FileText className="w-6 h-6 text-red-500" />;
+    if (fileType.includes('spreadsheet') || fileType.includes('excel') || fileType === 'text/csv') {
+      return <FileText className="w-6 h-6 text-green-600" />;
+    }
+    if (fileType.includes('word') || fileType.includes('document')) {
+      return <FileText className="w-6 h-6 text-blue-600" />;
+    }
+    if (fileType.includes('presentation') || fileType.includes('powerpoint')) {
+      return <FileText className="w-6 h-6 text-orange-500" />;
+    }
+    if (fileType.startsWith('video/')) return <FileIcon className="w-6 h-6 text-purple-500" />;
+    if (fileType.startsWith('audio/')) return <FileIcon className="w-6 h-6 text-pink-500" />;
+    if (fileType.startsWith('text/')) return <FileText className="w-6 h-6 text-gray-500" />;
+    return <FileIcon className="w-6 h-6 text-gray-400" />;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -260,12 +295,19 @@ export const FileManager: React.FC = () => {
     }
 
     try {
+      // Determine the full folder path
+      // If a folder is currently selected, create subfolder inside it
+      // Otherwise, create at root level
+      const fullFolderPath = selectedFolder
+        ? `${selectedFolder}/${createFolderName.trim()}`
+        : createFolderName.trim();
+
       // Create a placeholder file to establish the folder
       // This creates a small text file that acts as a folder marker
-      const folderContent = `This is a folder marker file for the "${createFolderName.trim()}" folder.\nCreated on ${new Date().toISOString()}`;
+      const folderContent = `This is a folder marker file for the "${fullFolderPath}" folder.\nCreated on ${new Date().toISOString()}`;
       const folderMarker = new File([folderContent], '.folder_marker', { type: 'text/plain' });
 
-      await uploadFile(folderMarker, '', createFolderName.trim(), `Folder: ${createFolderName.trim()}`);
+      await uploadFile(folderMarker, '', fullFolderPath, `Folder: ${fullFolderPath}`);
 
       toast.success(`Folder "${createFolderName.trim()}" created successfully!`);
       setCreateFolderName('');
@@ -413,15 +455,32 @@ export const FileManager: React.FC = () => {
 
       {/* Files Grid */}
       <div>
-        {/* Folders Section - Always show if folders exist and not inside a folder */}
-        {!selectedFolder && folders.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-              <FolderOpen className="w-5 h-5" />
-              Folders ({folders.length})
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {folders.map((folder) => (
+        {/* Folders Section - Show folders relevant to current location */}
+        {(() => {
+          // Filter folders based on current location
+          const visibleFolders = folders.filter((folder) => {
+            if (!selectedFolder) {
+              // At root: show only top-level folders (no "/" in the name)
+              return !folder.includes('/');
+            } else {
+              // Inside a folder: show only immediate subfolders
+              // Must start with selectedFolder/ and have no additional / after that
+              if (folder.startsWith(selectedFolder + '/')) {
+                const remainder = folder.substring(selectedFolder.length + 1);
+                return !remainder.includes('/'); // No deeper nesting
+              }
+              return false;
+            }
+          });
+
+          return visibleFolders.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <FolderOpen className="w-5 h-5" />
+                Folders ({visibleFolders.length})
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {visibleFolders.map((folder) => (
                 <div
                   key={folder}
                   className="relative group flex flex-col items-center p-3 bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-lg hover:shadow-md hover:border-primary-300 dark:hover:border-primary-600 transition-all"
@@ -453,9 +512,10 @@ export const FileManager: React.FC = () => {
                   </button>
                 </div>
               ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {filteredFiles.length === 0 ? (
           <div className="text-center py-16 bg-gray-50 dark:bg-dark-surface rounded-lg">
@@ -480,7 +540,7 @@ export const FileManager: React.FC = () => {
               className="bg-white dark:bg-dark-surface border border-gray-200 dark:border-dark-border rounded-lg p-4 hover:shadow-lg transition-shadow"
             >
               {/* File Icon/Preview */}
-              <div className="flex items-center justify-center h-32 mb-3 bg-gray-50 dark:bg-gray-800 rounded">
+              <div className="flex items-center justify-center h-32 mb-3 bg-gray-50 dark:bg-gray-800 rounded relative">
                 {file.file_type.startsWith('image/') ? (
                   <img
                     src={file.cloudinary_url}
@@ -490,6 +550,44 @@ export const FileManager: React.FC = () => {
                 ) : (
                   <div className="text-gray-400">{getFileIcon(file.file_type)}</div>
                 )}
+                {/* File type badge */}
+                <div className="absolute top-2 right-2">
+                  {file.file_type.includes('pdf') && (
+                    <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 text-xs font-semibold rounded">
+                      PDF
+                    </span>
+                  )}
+                  {(file.file_type.includes('spreadsheet') || file.file_type.includes('excel')) && (
+                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-xs font-semibold rounded">
+                      EXCEL
+                    </span>
+                  )}
+                  {file.file_type === 'text/csv' && (
+                    <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-xs font-semibold rounded">
+                      CSV
+                    </span>
+                  )}
+                  {(file.file_type.includes('word') || file.file_type.includes('document')) && !file.file_type.includes('spreadsheet') && (
+                    <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded">
+                      WORD
+                    </span>
+                  )}
+                  {(file.file_type.includes('presentation') || file.file_type.includes('powerpoint')) && (
+                    <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300 text-xs font-semibold rounded">
+                      PPT
+                    </span>
+                  )}
+                  {file.file_type.startsWith('video/') && (
+                    <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded">
+                      VIDEO
+                    </span>
+                  )}
+                  {file.file_type.startsWith('audio/') && (
+                    <span className="px-2 py-0.5 bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300 text-xs font-semibold rounded">
+                      AUDIO
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* File Info */}
@@ -688,12 +786,71 @@ export const FileManager: React.FC = () => {
                   className="w-full h-[600px] rounded-lg"
                   title={previewFile.original_filename}
                 />
+              ) : previewFile.file_type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                previewFile.file_type === 'application/vnd.ms-excel' ||
+                previewFile.file_type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                previewFile.file_type === 'application/msword' ||
+                previewFile.file_type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+                previewFile.file_type === 'application/vnd.ms-powerpoint' ||
+                previewFile.file_type === 'text/csv' ? (
+                <div className="space-y-3">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                    <p className="text-sm text-blue-800 dark:text-blue-300">
+                      {previewFile.file_type.includes('spreadsheet') || previewFile.file_type.includes('excel') || previewFile.file_type === 'text/csv' ?
+                        'Excel/CSV file - Using Google Docs Viewer for preview' :
+                        previewFile.file_type.includes('word') || previewFile.file_type.includes('document') ?
+                        'Word document - Using Google Docs Viewer for preview' :
+                        'PowerPoint presentation - Using Google Docs Viewer for preview'
+                      }
+                    </p>
+                  </div>
+                  <iframe
+                    src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewFile.cloudinary_url)}&embedded=true`}
+                    className="w-full h-[600px] rounded-lg border border-gray-200 dark:border-dark-border"
+                    title={previewFile.original_filename}
+                  />
+                </div>
+              ) : previewFile.file_type.startsWith('video/') ? (
+                <video
+                  src={previewFile.cloudinary_url}
+                  controls
+                  className="w-full rounded-lg"
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : previewFile.file_type.startsWith('audio/') ? (
+                <div className="flex flex-col items-center py-12">
+                  <FileIcon className="w-16 h-16 text-gray-400 mb-4" />
+                  <audio
+                    src={previewFile.cloudinary_url}
+                    controls
+                    className="w-full max-w-md"
+                  >
+                    Your browser does not support the audio tag.
+                  </audio>
+                </div>
+              ) : previewFile.file_type.startsWith('text/') ? (
+                <iframe
+                  src={previewFile.cloudinary_url}
+                  className="w-full h-[600px] rounded-lg border border-gray-200 dark:border-dark-border"
+                  title={previewFile.original_filename}
+                />
               ) : (
                 <div className="text-center py-12">
                   <FileIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 dark:text-stone-400">
+                  <p className="text-gray-600 dark:text-stone-400 mb-2">
                     Preview not available for this file type
                   </p>
+                  <p className="text-sm text-gray-500 dark:text-stone-500">
+                    File type: {previewFile.file_type}
+                  </p>
+                  <button
+                    onClick={() => handleDownload(previewFile)}
+                    className="mt-4 btn-primary flex items-center justify-center gap-2 mx-auto"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download to view</span>
+                  </button>
                 </div>
               )}
 
@@ -798,6 +955,15 @@ export const FileManager: React.FC = () => {
             </div>
 
             <div className="space-y-4">
+              {/* Show current location */}
+              {selectedFolder && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <p className="text-sm text-blue-800 dark:text-blue-300">
+                    <span className="font-medium">Creating folder inside:</span> {selectedFolder}
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-stone-300 mb-2">
                   Folder Name
@@ -806,7 +972,7 @@ export const FileManager: React.FC = () => {
                   type="text"
                   value={createFolderName}
                   onChange={(e) => setCreateFolderName(e.target.value)}
-                  placeholder="Enter folder name (e.g., 'Documents', '2024/Projects')"
+                  placeholder={selectedFolder ? "Enter subfolder name (e.g., 'Invoices')" : "Enter folder name (e.g., 'Documents', '2024/Projects')"}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-dark-border rounded-lg dark:bg-dark-surface dark:text-white focus:ring-2 focus:ring-primary-500"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
@@ -816,7 +982,10 @@ export const FileManager: React.FC = () => {
                   autoFocus
                 />
                 <p className="text-xs text-gray-500 dark:text-stone-400 mt-1">
-                  Use "/" to create nested folders (e.g., "Projects/2024")
+                  {selectedFolder
+                    ? `Will be created as: ${selectedFolder}/${createFolderName || '...'}`
+                    : 'Use "/" to create nested folders (e.g., "Projects/2024")'
+                  }
                 </p>
               </div>
 
