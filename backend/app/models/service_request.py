@@ -113,7 +113,7 @@ class ProductOrder(Base):
     quantity = Column(Integer, nullable=False)
     customer_name = Column(String, nullable=False)
     customer_email = Column(String, nullable=False, index=True)
-    tracking_password = Column(String, nullable=False)
+    tracking_id = Column(String, unique=True, index=True, nullable=False)
     delivery_address = Column(String, nullable=False)
     order_date = Column(String, nullable=False)
     expected_delivery_date = Column(String, nullable=False)

@@ -7,8 +7,7 @@ class ProductOrderCreate(BaseModel):
     model: str
     quantity: int
     customer_name: str
-    customer_email: str
-    tracking_password: str
+    customer_email: str  # Keep for admin contact purposes
     delivery_address: str
     order_date: str
     expected_delivery_date: str
@@ -20,6 +19,5 @@ class ProductOrderStatusUpdate(BaseModel):
     notes: Optional[str] = None
 
 
-class ProductOrderTrackRequest(BaseModel):
-    email: str
-    password: str
+class ProductOrderTrackByIdRequest(BaseModel):
+    tracking_id: str

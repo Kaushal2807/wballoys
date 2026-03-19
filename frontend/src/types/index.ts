@@ -146,12 +146,12 @@ export type ProductDeliveryStatus = 'pending' | 'dispatched' | 'in_transit' | 'd
 export interface ProductOrder {
   id: number;
   order_number: string;
+  tracking_id: string;
   product_name: string;
   model: string;
   quantity: number;
   customer_name: string;
-  customer_email: string;
-  tracking_password: string;
+  customer_email: string;  // Keep for business use
   delivery_address: string;
   order_date: string;
   expected_delivery_date: string;
@@ -167,8 +167,7 @@ export interface CreateProductOrderPayload {
   model: string;
   quantity: number;
   customer_name: string;
-  customer_email: string;
-  tracking_password: string;
+  customer_email: string;  // Keep for business use
   delivery_address: string;
   order_date: string;
   expected_delivery_date: string;

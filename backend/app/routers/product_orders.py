@@ -5,10 +5,11 @@ from app.database import get_db
 from app.models.user import User
 from app.models.service_request import ProductOrder
 from app.dependencies.auth import get_current_user, require_role
+from app.utils.tracking import generate_tracking_id, validate_tracking_id
 from app.schemas.product_order import (
     ProductOrderCreate,
     ProductOrderStatusUpdate,
-    ProductOrderTrackRequest,
+    ProductOrderTrackByIdRequest,
 )
 
 router = APIRouter()
@@ -25,12 +26,12 @@ def serialize_order(order):
     return {
         "id": order.id,
         "order_number": order.order_number,
+        "tracking_id": order.tracking_id,
         "product_name": order.product_name,
         "model": order.model,
         "quantity": order.quantity,
         "customer_name": order.customer_name,
         "customer_email": order.customer_email,
-        "tracking_password": order.tracking_password,
         "delivery_address": order.delivery_address,
         "order_date": order.order_date,
         "expected_delivery_date": order.expected_delivery_date,
@@ -50,24 +51,27 @@ def generate_order_number(db: Session) -> str:
 # ─── POST /api/product-orders/track (Public - no auth) ──
 @router.post("/track")
 def track_product_order(
-    data: ProductOrderTrackRequest,
+    data: ProductOrderTrackByIdRequest,
     db: Session = Depends(get_db),
 ):
-    orders = (
-        db.query(ProductOrder)
-        .filter(
-            ProductOrder.customer_email == data.email.lower(),
-            ProductOrder.tracking_password == data.password,
+    # Validate tracking ID format
+    if not validate_tracking_id(data.tracking_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid tracking ID format. Please check your tracking ID.",
         )
-        .order_by(ProductOrder.created_at.desc())
-        .all()
+
+    order = (
+        db.query(ProductOrder)
+        .filter(ProductOrder.tracking_id == data.tracking_id.upper())
+        .first()
     )
-    if not orders:
+    if not order:
         raise HTTPException(
             status_code=404,
-            detail="No orders found. Please check your email and password.",
+            detail="Order not found. Please check your tracking ID.",
         )
-    return [serialize_order(o) for o in orders]
+    return serialize_order(order)
 
 
 # ─── GET /api/product-orders (List all) ──
@@ -102,12 +106,12 @@ def create_product_order(
 ):
     new_order = ProductOrder(
         order_number=generate_order_number(db),
+        tracking_id=generate_tracking_id(db),  # Auto-generate tracking ID
         product_name=data.product_name,
         model=data.model,
         quantity=data.quantity,
         customer_name=data.customer_name,
         customer_email=data.customer_email.lower(),
-        tracking_password=data.tracking_password,
         delivery_address=data.delivery_address,
         order_date=data.order_date,
         expected_delivery_date=data.expected_delivery_date,

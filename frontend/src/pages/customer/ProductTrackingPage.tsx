@@ -15,23 +15,22 @@ const STEPS: { status: 'pending' | 'dispatched' | 'in_transit' | 'delivered'; la
 ];
 
 export const ProductTrackingPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [trackingId, setTrackingId] = useState('');
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState<ProductOrder[] | null>(null);
 
   const handleTrack = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim() || !password.trim()) {
-      toast.error('Please enter both email and password');
+    if (!trackingId.trim()) {
+      toast.error('Please enter your tracking ID');
       return;
     }
     setLoading(true);
     try {
-      const result = await requestService.getProductOrdersByCredentials(email.trim(), password.trim());
-      setOrders(result);
+      const result = await requestService.getProductOrderByTrackingId(trackingId.trim());
+      setOrders([result]); // Single order response
     } catch (err: any) {
-      toast.error(err?.message || 'Invalid credentials');
+      toast.error(err?.message || 'Tracking ID not found');
       setOrders(null);
     } finally {
       setLoading(false);
@@ -53,7 +52,7 @@ export const ProductTrackingPage: React.FC = () => {
               Track My Order
             </h1>
             <p className="text-sm text-gray-600 dark:text-dark-text-secondary mt-0.5">
-              Enter your email and tracking password to view delivery status
+              Enter your tracking ID to view delivery status
             </p>
           </div>
         </div>
@@ -63,29 +62,19 @@ export const ProductTrackingPage: React.FC = () => {
           <form onSubmit={handleTrack} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
-                Email Address *
+                Tracking ID *
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+                type="text"
+                value={trackingId}
+                onChange={e => setTrackingId(e.target.value.toUpperCase())}
                 className="input-field"
-                placeholder="e.g. orders@company.com"
+                placeholder="e.g. TRK-A1B2C3"
                 required
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-dark-text-secondary mb-1">
-                Tracking Password *
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="input-field"
-                placeholder="Enter your tracking password"
-                required
-              />
+              <p className="text-xs text-gray-500 dark:text-stone-400 mt-1">
+                Your unique tracking ID provided when the order was created
+              </p>
             </div>
             <button
               type="submit"

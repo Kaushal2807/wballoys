@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProductOrder, ProductDeliveryStatus } from '@/types';
 import { getProductDeliveryStatusColor, getProductDeliveryStatusLabel, formatDate } from '@/utils/helpers';
-import { Package, MapPin, Calendar, Eye, EyeOff, Hash, Box, User, FileText, Clock, Mail, Lock } from 'lucide-react';
+import { Package, MapPin, Calendar, Eye, EyeOff, Hash, Box, User, FileText, Clock, Mail } from 'lucide-react';
 
 interface ProductOrderCardProps {
   order: ProductOrder;
@@ -10,7 +10,6 @@ interface ProductOrderCardProps {
 
 export const ProductOrderCard: React.FC<ProductOrderCardProps> = ({ order, onUpdateStatus }) => {
   const [showDetails, setShowDetails] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   const getNextStatus = (current: ProductDeliveryStatus): ProductDeliveryStatus | null => {
     const pipeline: ProductDeliveryStatus[] = ['pending', 'dispatched', 'in_transit', 'delivered'];
@@ -167,20 +166,23 @@ export const ProductOrderCard: React.FC<ProductOrderCardProps> = ({ order, onUpd
               </div>
             </div>
             <div className="flex items-start gap-2 sm:col-span-2">
-              <Lock className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+              <Hash className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <p className="text-xs text-gray-500 dark:text-stone-400">Tracking Password</p>
+                <p className="text-xs text-gray-500 dark:text-stone-400">Tracking ID</p>
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium text-gray-900 dark:text-dark-text font-mono">
-                    {showPassword ? order.tracking_password : '••••••••'}
+                    {order.tracking_id}
                   </p>
                   <button
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-stone-300"
+                    onClick={() => navigator.clipboard.writeText(order.tracking_id)}
+                    className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
                   >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    Copy
                   </button>
                 </div>
+                <p className="text-xs text-gray-400 dark:text-stone-500 mt-1">
+                  Customers use this ID to track their delivery
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-2 sm:col-span-2">

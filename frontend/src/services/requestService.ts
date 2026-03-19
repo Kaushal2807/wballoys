@@ -249,8 +249,8 @@ export const requestService = {
     return response.data;
   },
 
-  getProductOrdersByCredentials: async (email: string, password: string): Promise<ProductOrder[]> => {
-    const response = await apiClient.post('/product-orders/track', { email, password });
+  getProductOrderByTrackingId: async (trackingId: string): Promise<ProductOrder> => {
+    const response = await apiClient.post('/product-orders/track', { tracking_id: trackingId });
     return response.data;
   },
 
