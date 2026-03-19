@@ -21,7 +21,6 @@ import {
   uploadMultipleFiles,
   getFiles,
   deleteFile,
-  updateFile,
   getCategories,
   getFolders,
   deleteFolder,
@@ -44,7 +43,6 @@ export const FileManager: React.FC = () => {
 
   // New file upload form
   const [newCategory, setNewCategory] = useState('');
-  const [newFolder, setNewFolder] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
