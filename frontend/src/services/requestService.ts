@@ -183,6 +183,15 @@ export const requestService = {
     return response.data;
   },
 
+  updateUser: async (userId: number, name: string, email: string): Promise<User> => {
+    const response = await apiClient.patch(`/users/${userId}`, { name, email });
+    return response.data;
+  },
+
+  deleteUser: async (userId: number): Promise<void> => {
+    await apiClient.delete(`/users/${userId}`);
+  },
+
   getAllAssets: async (): Promise<Asset[]> => {
     const response = await apiClient.get('/assets/');
     return response.data;
@@ -196,6 +205,26 @@ export const requestService = {
       asset_name, model, serial_number, location,
     });
     return response.data;
+  },
+
+  updateAsset: async (
+    assetId: number,
+    asset_name: string,
+    model: string,
+    serial_number: string,
+    location: string
+  ): Promise<Asset> => {
+    const response = await apiClient.patch(`/assets/${assetId}`, {
+      asset_name,
+      model,
+      serial_number,
+      location,
+    });
+    return response.data;
+  },
+
+  deleteAsset: async (assetId: number): Promise<void> => {
+    await apiClient.delete(`/assets/${assetId}`);
   },
 
   getCustomers: async (): Promise<User[]> => {

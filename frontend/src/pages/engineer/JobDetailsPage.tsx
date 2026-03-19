@@ -155,6 +155,41 @@ export const JobDetailsPage: React.FC = () => {
     if (!request) return;
     const nextStatus = getNextDeliveryStatus();
     if (!nextStatus) return;
+
+    // Validation for service_solved: require at least one recent note and one recent photo
+    if (nextStatus === 'service_solved') {
+      // Find when "next_date_given" status was last set
+      const nextDateUpdate = deliveryUpdates.find(du => du.status === 'next_date_given');
+
+      let recentUpdates, recentPhotos;
+
+      if (nextDateUpdate) {
+        const nextDateTime = new Date(nextDateUpdate.updated_at);
+
+        // Check for updates added after next_date_given status
+        recentUpdates = updates.filter(update => new Date(update.created_at) > nextDateTime);
+
+        // Check for photos uploaded after next_date_given status
+        recentPhotos = photos.filter(photo => new Date(photo.uploaded_at) > nextDateTime);
+      } else {
+        // If no next_date_given status found, require both notes and photos exist
+        recentUpdates = updates;
+        recentPhotos = photos;
+      }
+
+      const missing = [];
+      if (recentUpdates.length === 0) {
+        missing.push('work notes');
+      }
+      if (recentPhotos.length === 0) {
+        missing.push('photos');
+      }
+      if (missing.length > 0) {
+        toast.error(`Please add ${missing.join(' and ')} after the Next Date Given stage to mark as Service Solved.`);
+        return;
+      }
+    }
+
     setUpdatingDelivery(true);
     try {
       await requestService.updateDeliveryStatus(request.id, nextStatus, user!.id);

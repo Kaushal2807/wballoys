@@ -39,3 +39,8 @@ class GoogleAuthRequest(BaseModel):
 
 class UserRoleUpdate(BaseModel):
     role: str  # customer, engineer, manager, admin
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None

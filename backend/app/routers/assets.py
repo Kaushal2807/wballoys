@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from app.database import get_db
 from app.models.user import User
-from app.models.service_request import Asset
+from app.models.service_request import Asset, ServiceRequest
 from app.dependencies.auth import get_current_user, require_role
 
 router = APIRouter()
@@ -15,6 +15,13 @@ class AssetCreate(BaseModel):
     serial_number: str
     location: str
     customer_id: int = None
+
+
+class AssetUpdate(BaseModel):
+    asset_name: str = None
+    model: str = None
+    serial_number: str = None
+    location: str = None
 
 
 def serialize_asset(asset):
@@ -64,3 +71,59 @@ def create_asset(
     db.commit()
     db.refresh(asset)
     return serialize_asset(asset)
+
+
+# ─── PATCH /api/assets/{asset_id} (Update asset - admin) ──
+@router.patch("/{asset_id}", status_code=200)
+def update_asset(
+    asset_id: int,
+    data: AssetUpdate,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Update fields if provided
+    if data.asset_name is not None:
+        asset.asset_name = data.asset_name
+    if data.model is not None:
+        asset.model = data.model
+    if data.serial_number is not None:
+        asset.serial_number = data.serial_number
+    if data.location is not None:
+        asset.location = data.location
+
+    db.commit()
+    db.refresh(asset)
+    return serialize_asset(asset)
+
+
+# ─── DELETE /api/assets/{asset_id} (Delete asset - admin) ──
+@router.delete("/{asset_id}", status_code=200)
+def delete_asset(
+    asset_id: int,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    # Check for active service requests only
+    active_requests = db.query(ServiceRequest).filter(
+        ServiceRequest.asset_id == asset_id,
+        ServiceRequest.status.in_(["new", "assigned", "in_progress"])
+    ).count()
+
+    if active_requests > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete asset. {active_requests} active service request(s) exist. Complete or close them first."
+        )
+
+    db.delete(asset)
+    db.commit()
+
+    return {"message": f"Asset {asset.asset_name} deleted successfully", "id": asset_id}

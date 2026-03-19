@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
 from app.database import get_db
 from app.models.user import User
-from app.models.service_request import ServiceRequest, DeliveryUpdate, JobUpdate
+from app.models.service_request import ServiceRequest, DeliveryUpdate, JobUpdate, JobPhoto
 from app.schemas.request import DeliveryStatusUpdate
 from app.dependencies.auth import get_current_user, require_role
 
@@ -96,6 +96,58 @@ def update_delivery_status(
             status_code=400,
             detail=f"Invalid delivery transition: {current_delivery} -> {data.status}. Expected: {current_delivery} -> {expected_next}",
         )
+
+    # Validation for service_solved: require at least one recent note and one recent photo
+    if data.status == "service_solved":
+        # Find when "next_date_given" status was last set
+        next_date_update = (
+            db.query(DeliveryUpdate)
+            .filter(
+                DeliveryUpdate.request_id == request_id,
+                DeliveryUpdate.status == "next_date_given"
+            )
+            .order_by(DeliveryUpdate.updated_at.desc())
+            .first()
+        )
+
+        if next_date_update:
+            next_date_time = next_date_update.updated_at
+
+            # Check for notes added after next_date_given status
+            recent_note_count = (
+                db.query(JobUpdate)
+                .filter(
+                    JobUpdate.request_id == request_id,
+                    JobUpdate.created_at > next_date_time
+                )
+                .count()
+            )
+
+            # Check for photos uploaded after next_date_given status
+            recent_photo_count = (
+                db.query(JobPhoto)
+                .filter(
+                    JobPhoto.request_id == request_id,
+                    JobPhoto.uploaded_at > next_date_time
+                )
+                .count()
+            )
+        else:
+            # If no next_date_given status found, require both notes and photos exist
+            recent_note_count = db.query(JobUpdate).filter(JobUpdate.request_id == request_id).count()
+            recent_photo_count = db.query(JobPhoto).filter(JobPhoto.request_id == request_id).count()
+
+        missing = []
+        if recent_note_count == 0:
+            missing.append("work notes")
+        if recent_photo_count == 0:
+            missing.append("photos")
+
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot mark as Service Solved. Please add {' and '.join(missing)} after the Next Date Given stage.",
+            )
 
     request.delivery_status = data.status
     request.updated_at = datetime.utcnow()

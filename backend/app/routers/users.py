@@ -4,7 +4,9 @@ from app.database import get_db
 from app.models.user import User
 from app.utils.security import hash_password
 from app.dependencies.auth import get_current_user, require_role
-from app.schemas.user import UserCreate, UserRoleUpdate
+from app.schemas.user import UserCreate, UserRoleUpdate, UserUpdate
+from app.models.service_request import ServiceRequest, Asset, JobAssignment
+from app.models.file import File
 
 router = APIRouter()
 
@@ -89,3 +91,88 @@ def update_user_role(
     db.commit()
     db.refresh(target_user)
     return serialize_user(target_user)
+
+
+# ─── PATCH /api/users/{user_id} (Update user details - admin) ──
+@router.patch("/{user_id}", status_code=200)
+def update_user(
+    user_id: int,
+    data: UserUpdate,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    # Prevent admin from updating themselves
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot modify your own account details"
+        )
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check email uniqueness if changing
+    if data.email and data.email != target_user.email:
+        existing = db.query(User).filter(User.email == data.email).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already in use")
+
+    # Update fields
+    if data.name is not None:
+        target_user.name = data.name
+    if data.email is not None:
+        target_user.email = data.email
+
+    db.commit()
+    db.refresh(target_user)
+    return serialize_user(target_user)
+
+
+# ─── DELETE /api/users/{user_id} (Delete user - admin) ──
+@router.delete("/{user_id}", status_code=200)
+def delete_user(
+    user_id: int,
+    current_user: User = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    # Prevent self-deletion
+    if current_user.id == user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot delete your own account"
+        )
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check for dependencies
+    dependencies = []
+
+    asset_count = db.query(Asset).filter(Asset.customer_id == user_id).count()
+    if asset_count > 0:
+        dependencies.append(f"{asset_count} asset(s)")
+
+    request_count = db.query(ServiceRequest).filter(ServiceRequest.customer_id == user_id).count()
+    if request_count > 0:
+        dependencies.append(f"{request_count} service request(s)")
+
+    assignment_count = db.query(JobAssignment).filter(JobAssignment.engineer_id == user_id).count()
+    if assignment_count > 0:
+        dependencies.append(f"{assignment_count} job assignment(s)")
+
+    file_count = db.query(File).filter(File.user_id == user_id).count()
+    if file_count > 0:
+        dependencies.append(f"{file_count} file(s)")
+
+    if dependencies:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete user. User has {', '.join(dependencies)}. Please reassign or delete these first."
+        )
+
+    db.delete(target_user)
+    db.commit()
+
+    return {"message": f"User {target_user.name} deleted successfully", "id": user_id}
