@@ -2,10 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
-import { Mail, Lock, User, LogIn, Copy, Check } from 'lucide-react';
-import { DEMO_CREDENTIALS } from '@/types';
+import { Mail, Lock, User, LogIn } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { toast } from 'react-toastify';
 
 interface LoginFormData {
   email: string;
@@ -17,9 +15,8 @@ export const LoginPage: React.FC = () => {
   const { login, googleLogin } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [copiedRole, setCopiedRole] = useState<string | null>(null);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginFormData>();
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
@@ -33,12 +30,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const fillDemoCredentials = (role: keyof typeof DEMO_CREDENTIALS) => {
-    const credentials = DEMO_CREDENTIALS[role];
-    setValue('email', credentials.email);
-    setValue('password', credentials.password);
-  };
-
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
     try {
@@ -49,15 +40,6 @@ export const LoginPage: React.FC = () => {
     } finally {
       setIsGoogleLoading(false);
     }
-  };
-
-  const copyCredentials = (role: keyof typeof DEMO_CREDENTIALS) => {
-    const credentials = DEMO_CREDENTIALS[role];
-    const text = `Email: ${credentials.email}\nPassword: ${credentials.password}`;
-    navigator.clipboard.writeText(text);
-    setCopiedRole(role);
-    toast.success('Credentials copied!');
-    setTimeout(() => setCopiedRole(null), 2000);
   };
 
   return (
@@ -75,27 +57,36 @@ export const LoginPage: React.FC = () => {
       </nav>
 
       <div className="flex items-center justify-center p-4 min-h-[calc(100vh-3.5rem)]">
-      <div className="w-full max-w-6xl">
-        <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+        <div className="w-full max-w-lg">
           {/* Login Form */}
-          <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl p-6 sm:p-8 md:p-10">
+          <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl p-8 sm:p-10 backdrop-blur-sm border border-gray-200 dark:border-dark-border">
             {/* Logo and Title */}
             <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4">
-                <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center">
-                  <User className="w-10 h-10 text-white" />
+              {/* Logo */}
+              <div className="flex items-center justify-center mb-6">
+                <div className="w-20 h-20 bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl flex items-center justify-center shadow-lg">
+                  <User className="w-12 h-12 text-white" />
                 </div>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-dark-text mb-2">
-                Sign In
+
+              {/* Brand Name */}
+              <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-dark-text mb-2">
+                WB Alloys
               </h1>
+
+              {/* Tagline */}
+              <p className="text-lg font-medium text-primary-600 dark:text-primary-400 mb-4">
+                Service Management
+              </p>
+
+              {/* Description */}
               <p className="text-gray-600 dark:text-dark-text-secondary">
-                Sign in to your account
+                Sign in to access your dashboard
               </p>
             </div>
 
             {/* Login Form */}
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {/* Email Input */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-dark-text mb-2">
@@ -172,13 +163,13 @@ export const LoginPage: React.FC = () => {
               </button>
 
               {/* Divider */}
-              <div className="relative">
+              <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-300 dark:border-dark-border"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white dark:bg-dark-surface text-gray-500 dark:text-dark-text-secondary">
-                    or
+                  <span className="px-3 bg-white dark:bg-dark-surface text-gray-500 dark:text-dark-text-secondary font-medium">
+                    or continue with
                   </span>
                 </div>
               </div>
@@ -209,214 +200,7 @@ export const LoginPage: React.FC = () => {
               </button>
             </form>
           </div>
-
-          {/* Demo Credentials Panel */}
-          <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl p-6 sm:p-8 md:p-10">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-dark-text mb-4">
-              🎓 Demo Login Credentials
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-dark-text-secondary mb-6">
-              Click any role below to auto-fill credentials or copy them
-            </p>
-
-            <div className="space-y-4">
-              {/* Customer Demo */}
-              <div className="card p-4 border-2 border-transparent hover:border-blue-400 transition-all cursor-pointer">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-dark-text flex items-center space-x-2">
-                      <span className="badge bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
-                        Customer
-                      </span>
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-stone-400 mt-1">
-                      Create and track service requests
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => copyCredentials('customer')}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-dark-border rounded-lg transition-colors"
-                    title="Copy credentials"
-                  >
-                    {copiedRole === 'customer' ? (
-                      <Check className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-stone-400">Email:</span>
-                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
-                      {DEMO_CREDENTIALS.customer.email}
-                    </code>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-stone-400">Password:</span>
-                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
-                      {DEMO_CREDENTIALS.customer.password}
-                    </code>
-                  </div>
-                </div>
-                <button
-                  onClick={() => fillDemoCredentials('customer')}
-                  className="mt-3 w-full py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-sm font-medium"
-                >
-                  Auto-fill Customer Login
-                </button>
-              </div>
-
-              {/* Engineer Demo */}
-              <div className="card p-4 border-2 border-transparent hover:border-green-400 transition-all cursor-pointer">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-dark-text flex items-center space-x-2">
-                      <span className="badge bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300">
-                        Engineer
-                      </span>
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-stone-400 mt-1">
-                      Accept and complete jobs
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => copyCredentials('engineer')}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-dark-border rounded-lg transition-colors"
-                    title="Copy credentials"
-                  >
-                    {copiedRole === 'engineer' ? (
-                      <Check className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-stone-400">Email:</span>
-                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
-                      {DEMO_CREDENTIALS.engineer.email}
-                    </code>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-stone-400">Password:</span>
-                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
-                      {DEMO_CREDENTIALS.engineer.password}
-                    </code>
-                  </div>
-                </div>
-                <button
-                  onClick={() => fillDemoCredentials('engineer')}
-                  className="mt-3 w-full py-2 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-sm font-medium"
-                >
-                  Auto-fill Engineer Login
-                </button>
-              </div>
-
-              {/* Manager Demo */}
-              <div className="card p-4 border-2 border-transparent hover:border-purple-400 transition-all cursor-pointer">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-dark-text flex items-center space-x-2">
-                      <span className="badge bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300">
-                        Manager
-                      </span>
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-stone-400 mt-1">
-                      Assign and monitor all jobs
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => copyCredentials('manager')}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-dark-border rounded-lg transition-colors"
-                    title="Copy credentials"
-                  >
-                    {copiedRole === 'manager' ? (
-                      <Check className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-stone-400">Email:</span>
-                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
-                      {DEMO_CREDENTIALS.manager.email}
-                    </code>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-stone-400">Password:</span>
-                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
-                      {DEMO_CREDENTIALS.manager.password}
-                    </code>
-                  </div>
-                </div>
-                <button
-                  onClick={() => fillDemoCredentials('manager')}
-                  className="mt-3 w-full py-2 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors text-sm font-medium"
-                >
-                  Auto-fill Manager Login
-                </button>
-              </div>
-
-              {/* Admin Demo */}
-              <div className="card p-4 border-2 border-transparent hover:border-red-400 transition-all cursor-pointer">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-dark-text flex items-center space-x-2">
-                      <span className="badge bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300">
-                        Admin
-                      </span>
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-stone-400 mt-1">
-                      Manage users and equipment
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => copyCredentials('admin')}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-dark-border rounded-lg transition-colors"
-                    title="Copy credentials"
-                  >
-                    {copiedRole === 'admin' ? (
-                      <Check className="w-4 h-4 text-green-600" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-stone-400">Email:</span>
-                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
-                      {DEMO_CREDENTIALS.admin.email}
-                    </code>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 dark:text-stone-400">Password:</span>
-                    <code className="text-xs bg-gray-100 dark:bg-dark-bg px-2 py-1 rounded">
-                      {DEMO_CREDENTIALS.admin.password}
-                    </code>
-                  </div>
-                </div>
-                <button
-                  onClick={() => fillDemoCredentials('admin')}
-                  className="mt-3 w-full py-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors text-sm font-medium"
-                >
-                  Auto-fill Admin Login
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
-              <p className="text-xs text-yellow-800 dark:text-yellow-300">
-                ℹ️ <strong>Note:</strong> These are demo credentials for testing. Backend integration is pending.
-              </p>
-            </div>
-          </div>
         </div>
-      </div>
       </div>
     </div>
   );
