@@ -102,8 +102,65 @@ export interface JobPhoto {
   uploaded_by: number;
   photo_url: string;
   uploaded_at: string;
+
+  // Safety-specific fields for safety photos
+  safety_category?: SafetyPhotoCategory;
+  safety_notes?: string;
+  file_id?: number;
+
   // Populated fields
   uploader?: User;
+}
+
+// Safety Types
+export type SafetyPhotoCategory =
+  | 'site_conditions'
+  | 'safety_equipment'
+  | 'hazard_identification'
+  | 'workspace_preparation';
+
+export type SafetyParameterCategory =
+  | 'personal_protection'
+  | 'site_safety'
+  | 'equipment_safety'
+  | 'emergency_procedures';
+
+export interface SafetyParameter {
+  id: number;
+  name: string;
+  category: SafetyParameterCategory;
+  description?: string;
+  is_required: boolean;
+  order_index: number;
+}
+
+export interface SafetyChecklistItem {
+  id: number;
+  request_id: number;
+  safety_parameter_id: number;
+  checked_by: number;
+  checked_at: string;
+  notes?: string;
+  // Populated fields
+  safety_parameter?: SafetyParameter;
+  checker?: User;
+}
+
+export interface SafetyChecklistItemCreate {
+  safety_parameter_id: number;
+  notes?: string;
+}
+
+export interface SafetyPhotoUpload {
+  photo_url?: string;
+  safety_category: SafetyPhotoCategory;
+  safety_notes?: string;
+}
+
+export interface SafetyWorkStartData {
+  checklist_items: SafetyChecklistItemCreate[];
+  photos: SafetyPhotoUpload[];
+  notes?: string;
 }
 
 // Dashboard Statistics

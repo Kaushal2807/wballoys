@@ -3,6 +3,7 @@ import {
   Asset, User, DashboardStats, CreateRequestPayload,
   RequestFilters,
   ProductOrder, ProductDeliveryStatus, CreateProductOrderPayload,
+  SafetyWorkStartData, SafetyParameter,
 } from '../types';
 import apiClient from './api';
 
@@ -74,6 +75,38 @@ export const requestService = {
 
   startWork: async (requestId: number): Promise<ServiceRequest> => {
     const response = await apiClient.patch(`/requests/${requestId}/start`);
+    return response.data;
+  },
+
+  // Safety-enabled start work
+  startWorkWithSafety: async (requestId: number, safetyData: SafetyWorkStartData): Promise<ServiceRequest> => {
+    const response = await apiClient.post(`/requests/${requestId}/safety/start-work`, safetyData);
+    return response.data;
+  },
+
+  getSafetyParameters: async (): Promise<SafetyParameter[]> => {
+    const response = await apiClient.get('/requests/safety/parameters');
+    return response.data;
+  },
+
+  uploadSafetyPhoto: async (requestId: number, file: File, category: string, notes?: string): Promise<JobPhoto> => {
+    // For now, use a data URL approach since we don't have Cloudinary set up
+    // Convert file to base64 data URL for storage
+    const toBase64 = (f: File): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(f);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+      });
+
+    const base64 = await toBase64(file);
+
+    const response = await apiClient.post(`/requests/${requestId}/safety/photos`, {
+      photo_url: base64,
+      safety_category: category,
+      safety_notes: notes,
+    });
     return response.data;
   },
 
