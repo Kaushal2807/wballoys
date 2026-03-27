@@ -24,3 +24,20 @@ class DeliveryStatusUpdate(BaseModel):
 
 class JobUpdateCreate(BaseModel):
     notes: str
+
+
+class SafetyChecklistItemCreate(BaseModel):
+    safety_parameter_id: int
+    notes: Optional[str] = None
+
+
+class SafetyPhotoUpload(BaseModel):
+    photo_url: Optional[str] = None
+    safety_category: str
+    safety_notes: Optional[str] = None
+
+
+class SafetyWorkStartRequest(BaseModel):
+    checklist_items: List[SafetyChecklistItemCreate]
+    photos: List[SafetyPhotoUpload]
+    notes: Optional[str] = None

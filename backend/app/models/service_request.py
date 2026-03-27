@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -86,6 +86,11 @@ class JobPhoto(Base):
     photo_url = Column(String, nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Safety-specific fields for safety photos
+    safety_category = Column(String, nullable=True)  # site_conditions, safety_equipment, hazard_identification
+    safety_notes = Column(String, nullable=True)
+    file_id = Column(Integer, ForeignKey("files.id"), nullable=True)  # Link to File model for Cloudinary
+
     uploader = relationship("User")
 
 
@@ -124,3 +129,31 @@ class ProductOrder(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     creator = relationship("User")
+
+
+class SafetyParameter(Base):
+    __tablename__ = "safety_parameters"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    category = Column(String, nullable=False)  # personal_protection, site_safety, equipment_safety
+    description = Column(String, nullable=True)
+    is_required = Column(Boolean, default=True)
+    order_index = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SafetyChecklistItem(Base):
+    __tablename__ = "safety_checklist_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(Integer, ForeignKey("service_requests.id"), nullable=False)
+    safety_parameter_id = Column(Integer, ForeignKey("safety_parameters.id"), nullable=False)
+    checked_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    checked_at = Column(DateTime(timezone=True), server_default=func.now())
+    notes = Column(String, nullable=True)
+
+    # Relationships
+    request = relationship("ServiceRequest")
+    safety_parameter = relationship("SafetyParameter")
+    checker = relationship("User")

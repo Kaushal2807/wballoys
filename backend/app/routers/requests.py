@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session, joinedload
 from datetime import datetime
+from typing import Optional
 from app.database import get_db
 from app.models.user import User
 from app.models.service_request import (
@@ -10,8 +11,10 @@ from app.models.service_request import (
     JobUpdate,
     JobPhoto,
     Asset,
+    SafetyParameter,
+    SafetyChecklistItem,
 )
-from app.schemas.request import RequestCreate, JobUpdateCreate
+from app.schemas.request import RequestCreate, JobUpdateCreate, SafetyWorkStartRequest
 from app.dependencies.auth import get_current_user, require_role
 
 router = APIRouter()
@@ -499,7 +502,178 @@ def get_photos(
             "uploaded_by": p.uploaded_by,
             "photo_url": p.photo_url,
             "uploaded_at": p.uploaded_at.isoformat() if p.uploaded_at else None,
+            "safety_category": p.safety_category,
+            "safety_notes": p.safety_notes,
             "uploader": serialize_user(p.uploader),
         }
         for p in photos
     ]
+
+
+# ═══════════════════════════════════════════════════════════
+# SAFETY ENDPOINTS
+# ═══════════════════════════════════════════════════════════
+
+# ─── GET /api/requests/safety/parameters (get all safety parameters) ───
+@router.get("/safety/parameters")
+def get_safety_parameters(
+    category: Optional[str] = None,
+    current_user: User = Depends(require_role("engineer", "manager", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Get safety parameters, optionally filtered by category"""
+    query = db.query(SafetyParameter).order_by(SafetyParameter.order_index, SafetyParameter.name)
+
+    if category:
+        query = query.filter(SafetyParameter.category == category)
+
+    parameters = query.all()
+
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "category": p.category,
+            "description": p.description,
+            "is_required": p.is_required,
+            "order_index": p.order_index,
+        }
+        for p in parameters
+    ]
+
+
+# ─── POST /api/requests/{id}/safety/start-work (Start work with safety validation) ───
+@router.post("/{request_id}/safety/start-work")
+def start_work_with_safety(
+    request_id: int,
+    safety_data: SafetyWorkStartRequest,
+    current_user: User = Depends(require_role("engineer")),
+    db: Session = Depends(get_db),
+):
+    """Start work with safety checklist completion and photos (or complete safety for in-progress jobs)"""
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    # Allow safety verification for both assigned and in_progress jobs
+    if request.status not in ["assigned", "in_progress"]:
+        raise HTTPException(status_code=400, detail="Can only complete safety verification for assigned or in-progress requests")
+
+    # Check if safety was already completed for this request
+    existing_safety = db.query(SafetyChecklistItem).filter(
+        SafetyChecklistItem.request_id == request_id
+    ).first()
+
+    if existing_safety:
+        raise HTTPException(status_code=400, detail="Safety verification already completed for this request")
+
+    # Validate required safety parameters
+    required_params = db.query(SafetyParameter).filter(SafetyParameter.is_required == True).all()
+    provided_param_ids = {item.safety_parameter_id for item in safety_data.checklist_items}
+    required_param_ids = {p.id for p in required_params}
+
+    missing_required = required_param_ids - provided_param_ids
+    if missing_required:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required safety parameters: {missing_required}"
+        )
+
+    # Create safety checklist items
+    for item in safety_data.checklist_items:
+        checklist_item = SafetyChecklistItem(
+            request_id=request_id,
+            safety_parameter_id=item.safety_parameter_id,
+            checked_by=current_user.id,
+            notes=item.notes
+        )
+        db.add(checklist_item)
+
+    # Create safety photos
+    for photo_data in safety_data.photos:
+        photo = JobPhoto(
+            request_id=request_id,
+            uploaded_by=current_user.id,
+            photo_url=photo_data.photo_url or "",
+            safety_category=photo_data.safety_category,
+            safety_notes=photo_data.safety_notes
+        )
+        db.add(photo)
+
+    # Update request status to in_progress if it was assigned
+    if request.status == "assigned":
+        request.status = "in_progress"
+    request.updated_at = datetime.utcnow()
+
+    # Add timeline note with safety completion
+    if request.status == "in_progress":
+        safety_note = f"Engineer {current_user.name} completed retroactive safety verification. "
+    else:
+        safety_note = f"Engineer {current_user.name} started work with safety checks completed. "
+
+    safety_note += f"Validated {len(safety_data.checklist_items)} safety parameters"
+    if safety_data.photos:
+        safety_note += f" and uploaded {len(safety_data.photos)} safety photos"
+    if safety_data.notes:
+        safety_note += f". Notes: {safety_data.notes}"
+
+    update = JobUpdate(
+        request_id=request_id,
+        user_id=current_user.id,
+        notes=safety_note
+    )
+    db.add(update)
+
+    db.commit()
+
+    request = _base_query(db).filter(ServiceRequest.id == request.id).first()
+    return serialize_request(request)
+
+
+# ─── POST /api/requests/{id}/safety/photos (Upload safety photo) ───
+@router.post("/{request_id}/safety/photos")
+def upload_safety_photo(
+    request_id: int,
+    data: dict,
+    current_user: User = Depends(require_role("engineer", "manager")),
+    db: Session = Depends(get_db),
+):
+    """Upload safety photo with categorization"""
+    request = db.query(ServiceRequest).filter(ServiceRequest.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    # Validate safety category
+    valid_categories = ["site_conditions", "safety_equipment", "hazard_identification", "workspace_preparation"]
+    safety_category = data.get("safety_category")
+    if safety_category and safety_category not in valid_categories:
+        raise HTTPException(status_code=400, detail=f"Invalid safety category. Must be one of: {valid_categories}")
+
+    photo = JobPhoto(
+        request_id=request_id,
+        uploaded_by=current_user.id,
+        photo_url=data.get("photo_url", ""),
+        safety_category=safety_category,
+        safety_notes=data.get("safety_notes")
+    )
+    db.add(photo)
+    db.commit()
+    db.refresh(photo)
+
+    photo = (
+        db.query(JobPhoto)
+        .options(joinedload(JobPhoto.uploader))
+        .filter(JobPhoto.id == photo.id)
+        .first()
+    )
+
+    return {
+        "id": photo.id,
+        "request_id": photo.request_id,
+        "uploaded_by": photo.uploaded_by,
+        "photo_url": photo.photo_url,
+        "uploaded_at": photo.uploaded_at.isoformat() if photo.uploaded_at else None,
+        "safety_category": photo.safety_category,
+        "safety_notes": photo.safety_notes,
+        "uploader": serialize_user(photo.uploader),
+    }
