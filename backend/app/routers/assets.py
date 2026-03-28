@@ -52,16 +52,15 @@ def create_asset(
     current_user: User = Depends(require_role("admin", "manager", "customer")),
     db: Session = Depends(get_db),
 ):
-    # Customers create assets for themselves; admins/managers can specify customer_id
+    # Customers create assets for themselves; admins/managers can create shared assets or assign to customer
     if current_user.role == "customer":
         owner_id = current_user.id
-    elif data.customer_id:
-        owner_id = data.customer_id
     else:
-        raise HTTPException(status_code=400, detail="customer_id is required for admin/manager")
+        # Admin/manager: use provided customer_id or None for shared asset
+        owner_id = data.customer_id  # Can be None for shared assets
 
     asset = Asset(
-        customer_id=owner_id,
+        customer_id=owner_id,  # Can be None now
         asset_name=data.asset_name,
         model=data.model,
         serial_number=data.serial_number,

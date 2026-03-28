@@ -8,7 +8,7 @@ class Asset(Base):
     __tablename__ = "assets"
 
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     asset_name = Column(String, nullable=False)
     model = Column(String, nullable=False)
     serial_number = Column(String, nullable=False)
